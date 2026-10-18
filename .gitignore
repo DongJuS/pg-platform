@@ -2,7 +2,7 @@
 **/build/
 .idea/
 *.iml
-out/
+/out/
 .DS_Store
 .env
 .env.*

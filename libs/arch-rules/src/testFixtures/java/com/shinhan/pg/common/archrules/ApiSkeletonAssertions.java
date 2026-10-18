@@ -99,4 +99,37 @@ public final class ApiSkeletonAssertions {
                         method.toString());
         }
     }
+
+    /** 구현 완료된 서비스의 공통 계약: 기본 프로필 비활성 + 형식 오류 400.
+     *  유효 요청의 업무 동작은 서비스의 인수 테스트로 대체한다.
+     *  controllers는 컨트롤러 인스턴스(의존 UseCase는 테스트용 페이크)를 넘긴다. */
+    public static void implementedEndpoints(
+            Class<?> configuration,
+            Object[] controllers,
+            Object advice,
+            String malformedBodyPath,
+            String invalidIdPath)
+            throws Exception {
+        var controllerTypes =
+                Arrays.stream(controllers).map(Object::getClass).toArray(Class<?>[]::new);
+        try (var inactive = new AnnotationConfigApplicationContext()) {
+            inactive.register(configuration);
+            inactive.register(controllerTypes);
+            inactive.refresh();
+            for (var type : controllerTypes)
+                assertTrue(
+                        inactive.getBeansOfType(type).isEmpty(),
+                        type.getName() + " must stay inactive by default");
+        }
+        var mvc = MockMvcBuilders.standaloneSetup(controllers).setControllerAdvice(advice).build();
+        if (malformedBodyPath != null)
+            mvc.perform(
+                            post(malformedBodyPath)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content("{broken")
+                                    .header("Idempotency-Key", "mock-key"))
+                    .andExpect(status().isBadRequest());
+        if (invalidIdPath != null)
+            mvc.perform(get(invalidIdPath)).andExpect(status().isBadRequest());
+    }
 }
