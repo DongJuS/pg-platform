@@ -1,7 +1,7 @@
 # pg-platform
 
 <p align="center">
-  <img src="docs/readme/system-architecture.png" width="100%" alt="pg-platform system architecture. Users reach an Application Load Balancer and api-gateway in the main VPC. The main VPC holds the channel, core, information and external layers and a data subnet with PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC stands in for external institutions.">
+  <img src="docs/readme/system-architecture.png" width="100%" alt="pg-platform system architecture. Users reach a load balancer and the API Gateway in the main VPC. The core layer holds internet banking, payment processing, and clearing and settlement; the information layer holds wealth reporting and anti-money laundering; the external layer holds overseas remittance; and the data subnets hold PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC simulates the external institutions.">
 </p>
 
 pg-platform is a payment and banking platform laid out the way a Korean bank splits its systems. A channel layer faces customers, a core layer owns accounts and the ledger, an external layer handles overseas messages, and an information layer runs reports and anti-money-laundering checks. Every request to an outside institution leaves through one front-end processor (FEP), and every request to an outside AI model leaves through a separate AI gateway.
