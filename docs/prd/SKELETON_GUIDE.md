@@ -1,19 +1,19 @@
-# 서비스 내부 구현 스켈레톤
+# Service Internal Implementation Skeleton
 
-이번 스켈레톤은 서비스의 기능별 실제 파일·메서드·입출력 DTO·처리 TODO다. 기존 대표 유스케이스 틀을 구체화해 일반 서비스 11개에 유스케이스 53개, API 정의 41개를 뒀다. API 정의 중 36개는 skeleton 프로필에서만 매핑하고 5개는 보류 상태로 주석만 남겼다. Gateway와 Mock 4개의 라우팅·필터·기관 API·시나리오 파일도 별도로 뒀다.
+This skeleton consists of each service's real per-feature files, methods, input/output DTOs and processing TODOs. It expands the earlier representative use case frame into 53 use cases and 41 API definitions across 11 general services. Of the API definitions, 36 are mapped only in the skeleton profile, and 5 are deferred with comments only. Routing, filter, institution API and scenario files for the Gateway and the 4 Mocks are also provided separately.
 
-## 바로 볼 파일
+## Files to Start With
 
-- [AuthController — 회원가입·로그인·갱신·로그아웃·OTP](../../main-vpc/core/auth/src/main/java/com/shinhan/pg/auth/adapter/in/web/AuthController.java)
-- [TransferController — 이체 생성·상태·목록](../../main-vpc/core/transfer/src/main/java/com/shinhan/pg/transfer/adapter/in/web/TransferController.java)
-- [전체 API 목록](API_SKELETON_INDEX.md)
-- [기능 ID → 파일 체크리스트](FEATURE_FILE_CHECKLIST.md)
+- [AuthController — sign-up, login, refresh, logout, OTP](../../main-vpc/core/auth/src/main/java/com/shinhan/pg/auth/adapter/in/web/AuthController.java)
+- [TransferController — transfer creation, status, list](../../main-vpc/core/transfer/src/main/java/com/shinhan/pg/transfer/adapter/in/web/TransferController.java)
+- [Full API list](API_SKELETON_INDEX.md)
+- [Feature ID → file checklist](FEATURE_FILE_CHECKLIST.md)
 
-각 API 메서드 주석에는 기능 ID, HTTP 메서드/경로, 계약 상태, 인증 전제, 입력/출력, 정상·오류 후보, 미정, 출처를 적었다. ApplicationService 메서드에는 실제로 채울 처리 순서를 TODO로 적었다. 이는 계약·파일 작업 완료이며 금융 기능 완료를 뜻하지 않는다.
+Each API method comment states the feature ID, HTTP method/path, contract status, authentication assumption, input/output, success and error candidates, undecided items and source. Each ApplicationService method has the processing order to fill in written as a TODO. This completes the contract and file work; it does not mean the financial features are complete.
 
-## 서비스별 범위
+## Scope by Service
 
-| 서비스 | 개발용 HTTP 경로 | 보류 API | 조립하는 유스케이스 | 파일 안내 |
+| Service | Dev-only HTTP paths | Deferred APIs | Wired use cases | File guide |
 | --- | ---: | ---: | ---: | --- |
 | auth | 6 | 0 | 6 | [SKELETON.md](../../main-vpc/core/auth/SKELETON.md) |
 | account | 4 | 0 | 4 | [SKELETON.md](../../main-vpc/core/account/SKELETON.md) |
@@ -27,56 +27,56 @@
 | ai-gateway | 0 | 3 | 1 | [SKELETON.md](../../ai-vpc/ai-gateway/SKELETON.md) |
 | fep-adapter | 2 | 0 | 5 | [SKELETON.md](../../fep-vpc/fep-adapter/SKELETON.md) |
 
-## 파일을 채우는 위치
+## Where to Fill In Files
 
 ```text
 <service>/src/main/java/com/shinhan/pg/<service>/
 ├─ adapter/in/web/
-│  ├─ <업무>Controller.java      # HTTP 경로·신원·요청 변환·응답 후보
-│  ├─ request/<기능>Request.java
-│  ├─ response/<기능>Response.java
-│  └─ <서비스>ErrorMapper.java  # 업무 오류 → HTTP 계약, 현재 TODO
+│  ├─ <Business>Controller.java  # HTTP path, identity, request conversion, response candidates
+│  ├─ request/<Feature>Request.java
+│  ├─ response/<Feature>Response.java
+│  └─ <Service>ErrorMapper.java  # business error → HTTP contract, currently TODO
 ├─ application/
-│  ├─ command/<기능>Command.java
-│  ├─ result/<기능>Result.java
-│  ├─ port/in/<기능>UseCase.java
-│  ├─ port/out/<모델>Repository.java
-│  └─ service/<서비스>ApplicationService.java
+│  ├─ command/<Feature>Command.java
+│  ├─ result/<Feature>Result.java
+│  ├─ port/in/<Feature>UseCase.java
+│  ├─ port/out/<Model>Repository.java
+│  └─ service/<Service>ApplicationService.java
 ├─ domain/
-│  ├─ model/<업무모델>.java     # 필드·불변식 주석, 순수 Java
-│  ├─ policy/<업무규칙>.java    # 검증/계산 메서드와 구현 TODO
-│  └─ error/<서비스>ErrorCode.java
+│  ├─ model/<BusinessModel>.java  # field and invariant comments, pure Java
+│  ├─ policy/<BusinessRule>.java  # validation/calculation methods and implementation TODOs
+│  └─ error/<Service>ErrorCode.java
 ├─ adapter/out/persistence/
-│  ├─ <모델>PersistenceAdapter.java
-│  ├─ entity/<모델>Entity.java  # 필드 자리, ORM/컬럼 매핑은 미정
-│  ├─ mapper/<모델>EntityMapper.java
-│  └─ outbox/<서비스>OutboxStore.java
-└─ config/<서비스>SkeletonConfiguration.java
+│  ├─ <Model>PersistenceAdapter.java
+│  ├─ entity/<Model>Entity.java  # field placeholders, ORM/column mapping undecided
+│  ├─ mapper/<Model>EntityMapper.java
+│  └─ outbox/<Service>OutboxStore.java
+└─ config/<Service>SkeletonConfiguration.java
 ```
 
-조회용 readmodel과 Entity를 구분했다. User/Account/Journal/Posting/Transfer/Payment/Refund/Report/SwiftMessage/AmlCase/FepMessage/SettlementCycle 등의 업무 모델·Repository·Entity·Mapper 파일을 만들었다. JPA/JdbcClient/MyBatis와 물리 컬럼을 임의 확정하거나 업무 migration을 추가하지 않았다. 각 Repository/Mapper의 미구현 메서드를 채우면서 실제 데이터 계약을 확정한다.
+Read models for queries are kept separate from Entities. Business model, Repository, Entity and Mapper files were created for User/Account/Journal/Posting/Transfer/Payment/Refund/Report/SwiftMessage/AmlCase/FepMessage/SettlementCycle and others. JPA/JdbcClient/MyBatis and the physical columns were not arbitrarily fixed, and no business migrations were added. The real data contract is confirmed while filling in the unimplemented methods of each Repository/Mapper.
 
-## 결정 유지
+## Decisions Kept
 
-- [확정 ADR](../adr/0001-financial-integration-decisions.md): 금융 대외 요청은 내부 REST → FEP, 원장 ledger.posted와 이체 transfer.completed 발행 책임 분리.
-- 보고서는 PDF/S3 저장 완료 후 동기 응답한다. 과거 문서의 202 접수·비동기 큐를 확정으로 복사하지 않았다. 생성 단계·기준 시점·복구 작업은 유지한다.
-- Outbox 폴링과 원장 비관적 잠금의 구현 위치·트랜잭션 조건을 주석으로 둔다. 실제 SQL·동시성·DB 원자성은 아직 구현하지 않았다.
-- account/ledger는 MariaDB, 나머지 저장 서비스는 PostgreSQL. 기존 AI 전용 NAT 코드와 배포 순서를 유지한다. 이번 작업에서 AWS를 호출·배포하지 않았다.
-- 확장 로그아웃, AI 쿼터·통계, SWIFT 운영 조회 등 보류 기능은 코드 주석/파일 자리만 있으며 매핑을 등록하지 않는다. AI 중계 역할은 확정이나 inference HTTP 세부 계약은 기존 보류 표기를 유지한다.
+- [Confirmed ADR](../adr/0001-financial-integration-decisions.md): financial external requests use internal REST → FEP, and publishing responsibility is split between the ledger (ledger.posted) and the transfer service (transfer.completed).
+- Reports respond synchronously after the PDF/S3 save completes. The 202 acceptance and asynchronous queue from older documents were not copied over as confirmed. The generation stage, as-of time and recovery jobs stay.
+- The implementation locations and transaction conditions for Outbox polling and the ledger's pessimistic locking are written as comments. Real SQL, concurrency and DB atomicity are not implemented yet.
+- account/ledger use MariaDB, and the other storage services use PostgreSQL. The existing AI-only NAT code and the deployment order stay. This work did not call or deploy to AWS.
+- Deferred features such as extended logout, AI quotas/statistics and SWIFT operations lookup have only code comments/file placeholders, and no mappings are registered. The AI relay role is confirmed, but the detailed inference HTTP contract keeps its existing deferred label.
 
-## 실행 상태와 검증
+## Runtime Status and Verification
 
-기본/local/aws 프로필에는 신규 업무 Controller·ApplicationService를 등록하지 않는다. skeleton 프로필에서 유효한 요청을 호출하면 FeatureNotImplementedException을 공통 웹 handler가 **501**로 변환한다. 형식 오류는 **400**이다. 200/201/202/204 등의 주석·annotation은 구현할 정상 계약의 초안이며 현재 금융 성공을 만들어내지 않는다.
+The default/local/aws profiles do not register the new business Controllers or ApplicationServices. When a valid request is called in the skeleton profile, the shared web handler converts FeatureNotImplementedException to **501**. Format errors return **400**. Comments and annotations such as 200/201/202/204 are drafts of the success contract to implement, and they do not currently produce any financial success.
 
-인증·인가·Bean Validation·HTTP 성공/실패 상세·페이지네이션·스키마·원장 로직·외부 client·실제 ORM/SQL은 TODO다. request attribute는 신뢰한 인증 문맥을 연결할 자리이며 실제 JWT/서비스 인증을 구현한 것으로 간주하지 않는다. API 계약 테스트는 이 스켈레톤 단계의 형식·미구현 표시를 검증한다. 기능을 구현할 때 해당 검사를 실제 인수 조건 테스트로 교체한다.
+Authentication, authorization, Bean Validation, HTTP success/failure details, pagination, schemas, ledger logic, external clients and real ORM/SQL are TODO. The request attribute is a placeholder for wiring a trusted authentication context; do not treat it as real JWT/service authentication. The API contract tests verify the format and not-implemented markers at this skeleton stage. When implementing a feature, replace those checks with real acceptance-criteria tests.
 
-전체 빌드 **69개 테스트 통과**, 실패/오류/skip 0. 개발용 경로 36개, 보류 API 5개의 비노출, 기본 프로필 비활성, HTTP 501/400, 53개 유스케이스 조립, R1~R7, 기존 PostgreSQL/Kafka/Redis Testcontainers 검사를 확인했다. 금융 정합성·실제 동시 출금·목표 처리량 검증은 아니다.
+The full build has **69 tests passing**, with 0 failures/errors/skips. Verified: the 36 dev-only paths, the 5 deferred APIs not exposed, the default profile inactive, HTTP 501/400, wiring of 53 use cases, R1~R7, and the existing PostgreSQL/Kafka/Redis Testcontainers checks. This is not verification of financial consistency, real concurrent withdrawals or target throughput.
 
-### 2026-10-18 스켈레톤 갭 점검
+### 2026-10-18 Skeleton Gap Check
 
-- 77개 기능 ID를 소스와 대조했다. 게이트웨이의 CMN-F02·MVP2-F10·MVP2-F11만 소스 주석에 없어 GatewayRoutesConfiguration·GatewayJwtFilter·GatewayRateLimitFilter·InternalPathBlockFilter에 기능 ID와 구현 범위·미정 항목을 추가했다(라우팅 동작 변경 없음). 나머지 74개는 소스에서 추적 가능하다.
-- transfer의 최초 스캐폴드 잔재 `domain/TransferErrorCode`(공통 ErrorCode 구현 예시)가 `domain/error/TransferErrorCode`(업무 오류 초안)와 중복이고 참조가 없어 삭제했다.
-- 체크리스트 참조 파일 147개·api-skeleton-files.json 544개 전부 실제 존재, 보류 5개 매핑 비활성, skeleton 프로필 활성 매핑 36개를 재확인했다.
-- Figma 프레임은 인증 없이 접근할 수 없어 확인하지 못했다. 게이트웨이 헬스·메트릭 범위 등 Figma 의존 항목은 소스 주석에 'Figma 프레임 확인 필요'로 표기했다. ADR 확정 결정과 코드·문서의 일치는 로컬로 검증했다.
+- Cross-checked the 77 feature IDs against the source. Only the gateway's CMN-F02, MVP2-F10 and MVP2-F11 were missing from source comments, so the feature IDs, implementation scope and undecided items were added to GatewayRoutesConfiguration, GatewayJwtFilter, GatewayRateLimitFilter and InternalPathBlockFilter (no change to routing behavior). The other 74 are traceable in the source.
+- In transfer, `domain/TransferErrorCode` (an example implementation of the shared ErrorCode), a leftover from the first scaffold, duplicated `domain/error/TransferErrorCode` (the business error draft) and had no references, so it was deleted.
+- Re-verified that all 147 files referenced by the checklist and all 544 in api-skeleton-files.json exist, that the 5 deferred mappings are inactive, and that 36 mappings are active in the skeleton profile.
+- Figma frames could not be checked because they cannot be accessed without authentication. Figma-dependent items such as the gateway health and metrics scope carry a TODO in the source comments saying the Figma frame still needs checking. Consistency between the confirmed ADR decisions and the code/docs was verified locally.
 
-[검증 결과](verification-api-skeleton.json) · [빌드 기록](verification-api-skeleton-build.log) · [파일 목록](api-skeleton-files.json)
+[Verification results](verification-api-skeleton.json) · [Build log](verification-api-skeleton-build.log) · [File list](api-skeleton-files.json)
