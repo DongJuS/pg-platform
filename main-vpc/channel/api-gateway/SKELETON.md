@@ -1,9 +1,9 @@
-# API Gateway 구현 파일
+# API Gateway implementation files
 
-- config/GatewayRoutesConfiguration.java: 외부 경로와 대상 서비스, Ledger 상세 경로 우선 매칭, 내부 경로 제외·동기 보고서 timeout 연결 TODO.
-- filter/GatewayJwtFilter.java: RS256 검증·만료·철회·신뢰한 사용자 문맥 전파 자리.
-- filter/GatewayRateLimitFilter.java: Redis 원자 카운터·TTL·429·실패 모드 자리.
-- filter/InternalPathBlockFilter.java: 내부 경로와 외부 catch-all의 경계 검증 자리.
-- config/DeferredOperationsApiPlan.java: 보류 운영 API 두 개의 후보 주석.
+- config/GatewayRoutesConfiguration.java: TODO for external paths and target services, priority matching of detailed Ledger paths, internal path exclusion, and connecting the synchronous report timeout.
+- filter/GatewayJwtFilter.java: placeholder for RS256 verification, expiry, revocation and propagation of the trusted user context.
+- filter/GatewayRateLimitFilter.java: placeholder for the Redis atomic counter, TTL, 429 and failure mode.
+- filter/InternalPathBlockFilter.java: placeholder for validating the boundary between internal paths and the external catch-all.
+- config/DeferredOperationsApiPlan.java: candidate comments for two deferred operations APIs.
 
-위 신규 파일은 실제 route/filter bean을 등록하지 않는다. 기존 health 외 기본 차단을 유지한다. 금융 Controller·도메인·Repository를 Gateway에 두지 않는다.
+The new files above do not register real route/filter beans. Everything except the existing health endpoint stays blocked by default. No financial Controller, domain code or Repository is placed in the Gateway.

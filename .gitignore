@@ -15,3 +15,7 @@
 backend.hcl
 
 infra/terraform/modules/*/.terraform.lock.hcl
+
+docs/adr/
+docs/api/
+docs/prd/
