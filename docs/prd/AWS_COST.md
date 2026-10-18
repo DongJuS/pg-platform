@@ -1,26 +1,26 @@
-# dev 월 비용 — 2026-10-18, 서울, USD
+# dev Monthly Cost — 2026-10-18, Seoul, USD
 
-최초 NAT 1개 예산에서 [AI 전용 NAT 추가 결정](../adr/0001-financial-integration-decisions.md)을 반영해 범위 추정을 갱신했다. FEP 1개+AI 1개, 총 2개의 개발용 zonal NAT를 전제로 한다. NAT는 서울 공개 설명의 약값을 사용하므로 SKU별 확정 견적과 구분한다.
+The range estimate was updated from the original one-NAT budget to reflect the [decision to add an AI-only NAT](../adr/0001-financial-integration-decisions.md). It assumes two dev zonal NATs in total: one for FEP and one for AI. The NAT figure uses an approximate price from a public description for Seoul, so keep it separate from a confirmed per-SKU quote.
 
-실제 AWS 리소스를 생성하지 않았다. 이번 작업에 따른 추가 AWS 청구는 없다. 유료 리소스 토글 기본값은 모두 false다. 빈 S3 버킷/state 소량 저장만 있는 기본 구성을 적용한 유휴 상태는 월 약 $0~1을 예상한다.
+No real AWS resources were created. This work adds no AWS charges. All paid-resource toggles default to false. The idle state with the default configuration applied, which holds only an empty S3 bucket and a small amount of state, is expected to cost about $0~1 per month.
 
-아래는 모든 저장소와 서비스 16개, endpoint를 월 730시간 켠 **유휴 개발 환경 추정**이다. 일 1,000만 요청의 성능·비용 견적이 아니다.
+Below is an **idle development environment estimate** with all data stores, the 16 services and the endpoints running 730 hours a month. It is not a performance or cost quote for 10 million requests per day.
 
-| 항목 | 전제 | 월 USD |
+| Item | Assumption | USD/month |
 | --- | --- | ---: |
-| Fargate | ARM 16개 × 0.25vCPU/0.5GiB | 132.66 |
-| Interface endpoints | 4종 × 4 VPC × 2 AZ = 32 AZ 과금 단위 | 303.68 |
-| RDS | db.t4g.micro 2개, Single-AZ, gp3 합계 40GB | 41.74 |
-| Redis | cache.t4g.micro 1개 | 17.52 |
-| MSK | kafka.t3.small 2개, 합계 20GB | 85.35 |
-| 소계 | NAT·ALB·로그·secret 등 제외 | 580.95 |
+| Fargate | 16 ARM × 0.25vCPU/0.5GiB | 132.66 |
+| Interface endpoints | 4 types × 4 VPCs × 2 AZs = 32 AZ billing units | 303.68 |
+| RDS | 2 × db.t4g.micro, Single-AZ, 40GB gp3 in total | 41.74 |
+| Redis | 1 × cache.t4g.micro | 17.52 |
+| MSK | 2 × kafka.t3.small, 20GB in total | 85.35 |
+| Subtotal | Excludes NAT, ALB, logs, secrets, etc. | 580.95 |
 
-NAT 2개·IPv4·선택적 ALB·소량 로그/Secrets Manager/S3까지 포함한 예산 범위는 **월 약 $700~800**다. 기존 범위 $650~750에 AI NAT 1개와 IPv4 1개를 월 약 $46.72 추가하는 간략 추정이다. NAT는 약 $0.059/시간 × 730 = $43.07, IPv4는 $0.005/시간 × 730 = $3.65로 계산했다. NAT 시간 단가는 최신 AWS 공식 설명의 서울 약값이며 원가표 SKU 조회값은 아니다. 트래픽·NAT 처리·AZ 간 통신·저장소 증가·LLM API 사용료·세금은 별도다.
+Including two NATs, IPv4, an optional ALB and small amounts of logs/Secrets Manager/S3, the budget range is **about $700~800 per month**. This is a rough estimate that adds one AI NAT and one IPv4 address, about $46.72 per month, to the earlier range of $650~750. NAT is calculated as about $0.059/hour × 730 = $43.07, and IPv4 as $0.005/hour × 730 = $3.65. The NAT hourly rate is an approximate Seoul price from the latest official AWS description, not a SKU value looked up in the price list. Traffic, NAT processing, cross-AZ traffic, storage growth, LLM API fees and taxes are extra.
 
-가장 큰 고정비는 interface endpoint다. AI NAT를 별도 구역에 추가해 금융 FEP 출구와 분리했다. 목적지 CIDR 규칙과 client 검사 코드 자체에 별도 관리형 방화벽 비용을 더하지 않았으며 실제 제공사 목적지 설정은 후속이다. 비용을 바꾸려면 endpoint 배치·공유를 별도 설계해야 한다.
+The largest fixed cost is the interface endpoints. The AI NAT was added in the AI VPC to keep it apart from the financial FEP egress. No separate managed firewall cost was added for the destination CIDR rules or the client check code itself, and configuring the real provider destinations is follow-up work. Changing the cost requires a separate design for endpoint placement and sharing.
 
-NAT 약값 근거: [AWS 공식 비교 설명, 2026-07-02](https://aws.amazon.com/cn/blogs/china/amazon-vpc-regional-nat-gateway-az-nat-gateway-comparison/). IPv4는 아래 AmazonVPC 서울 가격표의 APN2-PublicIPv4:InUseAddress 항목을 사용했다.
+Source for the approximate NAT price: [Official AWS comparison write-up, 2026-07-02](https://aws.amazon.com/cn/blogs/china/amazon-vpc-regional-nat-gateway-az-nat-gateway-comparison/). For IPv4, the APN2-PublicIPv4:InUseAddress item in the AmazonVPC Seoul price list below was used.
 
-AWS 공개 서울 가격표: [ECS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-2/index.json), [VPC](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonVPC/current/ap-northeast-2/index.json), [RDS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-2/index.json), [ElastiCache](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonElastiCache/current/ap-northeast-2/index.json), [MSK](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonMSK/current/ap-northeast-2/index.json). SKU·단가·발행일은 [aws-cost-estimate.json](aws-cost-estimate.json)에 있다.
+Public AWS Seoul price lists: [ECS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-2/index.json), [VPC](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonVPC/current/ap-northeast-2/index.json), [RDS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-2/index.json), [ElastiCache](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonElastiCache/current/ap-northeast-2/index.json), [MSK](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonMSK/current/ap-northeast-2/index.json). SKUs, unit prices and publication dates are in [aws-cost-estimate.json](aws-cost-estimate.json).
 
-`enable_*` 변경은 원하는 Terraform 구성을 바꾸며 단순 일시 정지 버튼이 아니다. RDS 삭제 보호와 최종 스냅샷은 유지했다. apply는 실행하지 않았다.
+Changing `enable_*` changes the desired Terraform configuration; it is not a simple pause button. RDS deletion protection and the final snapshot are kept. apply was not run.
