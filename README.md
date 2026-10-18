@@ -32,7 +32,7 @@ A request moves through the platform in five steps.
 2. `api-gateway` checks the JWT (RS256, issued by `auth`) and the rate limit (Redis), then routes the call to the core or information layer. Until those checks are implemented, it blocks everything except health checks.
 3. Each service runs the use case behind an input port. Domain code is plain Java. Adapters talk to the service's own database, to Kafka and to other services.
 4. A service that changes state writes the change and an outbox row in one local transaction. A polling relay publishes outbox rows to Kafka, and consumers drop duplicates by key, because delivery is at-least-once.
-5. Calls to outside institutions go to `fep-adapter` over internal REST on port 8091, across VPC peering. Only the FEP VPC and the AI VPC have NAT gateways, and the data subnets have no route to the internet.
+5. Calls to outside institutions go to `fep-adapter` over internal REST, across VPC peering. Only the FEP VPC and the AI VPC have NAT gateways, and the data subnets have no route to the internet.
 
 | Flow | Path |
 | --- | --- |
@@ -47,7 +47,7 @@ A request moves through the platform in five steps.
 
 ---
 
-The scope is split into seven MVPs. The [feature file checklist](docs/prd/FEATURE_FILE_CHECKLIST.md) maps each feature ID to its input port, use case and files. Of the 41 documented API contracts, 36 are wired as dev-only routes that return 501, and 5 deferred ones stay as comments.
+The scope is split into seven MVPs. Each feature ID maps to an input port, a use case and its files. Of the 41 documented API contracts, 36 are wired as dev-only routes that return 501, and 5 deferred ones stay as comments.
 
 | MVP | Feature area | Services |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ pg-platform/
 │  └─ observability/  Prometheus, Grafana and Collector config
 ├─ build-logic/   convention plugins, shared web templates, shared config
 ├─ load-test/     architecture mutation check (business load scenarios are TODO)
-└─ docs/          adr, prd, api, architecture
+└─ docs/          architecture diagram (ADR, PRD and API notes stay local)
 ```
 
 Inside a service, the layers come first (domain-driven design with ports and adapters). The package root is `com.shinhan.pg.<service>`.
@@ -123,7 +123,7 @@ Inside a service, the layers come first (domain-driven design with ports and ada
 
 ---
 
-These rules decide how money and messages move. They come from [the accepted design decisions](docs/adr/0001-financial-integration-decisions.md) and the earlier folder-structure decisions.
+These rules decide how money and messages move. They come from the accepted design decisions (ADR 0001) and the earlier folder-structure decisions.
 
 | Rule | Why |
 | --- | --- |
@@ -199,7 +199,7 @@ terraform -chdir=infra/terraform/envs/dev validate
 | Python 3 | `load-test/verify-architecture-mutations.py` |
 | AWS credentials | Only for a real `terraform plan`. Never run `apply` from this repository. |
 
-A real AWS deployment also needs an existing S3 state bucket, a Secrets Manager name per service, immutable image URIs, and an ACM certificate ARN if public ingress is on. See [open questions and deployment inputs](docs/prd/OPEN_QUESTIONS.md).
+A real AWS deployment also needs an existing S3 state bucket, a Secrets Manager name per service, immutable image URIs, and an ACM certificate ARN if public ingress is on.
 
 ## Data Storage
 
@@ -232,13 +232,13 @@ On AWS, the stores live in the main VPC's data subnets, which have no route to t
 
 ---
 
-What has been checked, with the recorded output:
+What has been checked (the verification logs are kept locally, not in Git):
 
-- The build passes 69 tests with no failures or skips. It covers 11 service modules, 53 use cases and 41 API contracts. See [verification-api-skeleton.json](docs/prd/verification-api-skeleton.json).
-- ArchUnit rules R1 to R7 run in all 16 modules. Injected R1, R5 and Money-inheritance violations fail as expected ([R1](docs/prd/verification-r1-expected-failure.log), [R5](docs/prd/verification-r5-expected-failure.log), [R6](docs/prd/verification-r6-expected-failure.log)).
+- The build passes 69 tests with no failures or skips. It covers 11 service modules, 53 use cases and 41 API contracts.
+- ArchUnit rules R1 to R7 run in all 16 modules. Injected R1, R5 and Money-inheritance violations fail as expected.
 - Under the `skeleton` profile, 36 dev-only routes return 501 for valid requests and 400 for malformed ones. The 5 deferred APIs have no mapping.
 - Testcontainers runs against PostgreSQL, Kafka and Redis.
-- Locally, `transfer` and `account` report health UP, the trace header is valid, and the Collector receives traces ([verification-local-runtime.json](docs/prd/verification-local-runtime.json)).
+- Locally, `transfer` and `account` report health UP, the trace header is valid, and the Collector receives traces.
 - `terraform fmt` and `validate` pass, and mocked Terraform tests check NAT isolation and the internal FEP routes in CI.
 
 What is not done or not proven:
@@ -247,7 +247,7 @@ What is not done or not proven:
 - Nothing is deployed to AWS. `terraform plan` has not run against a real account, and `apply` has never run.
 - Database atomicity, concurrency, recovery after a lost response, and load have not been verified. `load-test/` has no business scenarios yet.
 - R7 checks Java and HTTP transport calls in the main VPC. It cannot catch URLs in strings or calls made through reflection; the network rules close that gap.
-- The AWS cost figures are range estimates ([AWS_COST.md](docs/prd/AWS_COST.md)).
+- The AWS cost figures are range estimates.
 - Comments in the Java sources are still in Korean.
 
 ## Documentation
@@ -257,14 +257,8 @@ What is not done or not proven:
 | Document | What it covers |
 | --- | --- |
 | [Architecture diagram](docs/architecture/system-architecture.svg) | The diagram at the top of this page |
-| [ADR 0001: financial integration decisions](docs/adr/0001-financial-integration-decisions.md) | The six accepted decisions and their checklist |
-| [Skeleton guide](docs/prd/SKELETON_GUIDE.md) | How a service skeleton is laid out and what each file is for |
-| [API skeleton index](docs/prd/API_SKELETON_INDEX.md) | Every API path and the files behind it |
-| [Feature file checklist](docs/prd/FEATURE_FILE_CHECKLIST.md) | Feature IDs mapped to their files |
-| [Platform implementation TODO](docs/prd/PLATFORM_IMPLEMENTATION_TODO.md) | Observability, load testing, build and deploy work still open |
-| [Open questions](docs/prd/OPEN_QUESTIONS.md) | Deferred decisions and AWS deployment inputs |
-| [AWS cost](docs/prd/AWS_COST.md) | Estimated dev-environment cost |
-| [Scaffolding report](docs/prd/SCAFFOLDING_REPORT.md) | The first boilerplate verification record |
 | `SKELETON.md` in each service | That service's APIs, files and entry points |
 | [AGENTS.md](AGENTS.md) | Review rules for AI agents working in this repository |
 | [Figma: sinhan-financial-project](https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project) | The design source of truth |
+
+ADR, PRD and API notes are kept locally under `docs/adr`, `docs/prd` and `docs/api`. They are listed in `.gitignore` and are not pushed.
