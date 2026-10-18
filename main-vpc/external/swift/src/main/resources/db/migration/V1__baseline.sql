@@ -1,0 +1,1 @@
+-- Infrastructure baseline only. No business tables or outbox table are defined here.

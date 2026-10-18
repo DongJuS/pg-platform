@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ledger
+  config:
+    import: classpath:platform-defaults.yml,classpath:platform-infra.yml
+server:
+  port: ${SERVER_PORT:8083}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://localhost:23306/ledger_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}

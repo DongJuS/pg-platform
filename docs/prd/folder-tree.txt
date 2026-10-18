@@ -1,0 +1,64 @@
+pg-platform/
+├─ .github/
+│  └─ workflows/
+├─ ai-vpc/
+│  └─ ai-gateway/
+│     └─ src/
+├─ build-logic/
+│  ├─ .kotlin/
+│  │  └─ sessions/
+│  └─ src/
+│     └─ main/
+├─ docs/
+│  ├─ adr/
+│  ├─ api/
+│  └─ prd/
+├─ fep-vpc/
+│  └─ fep-adapter/
+│     └─ src/
+├─ gradle/
+│  └─ wrapper/
+├─ hooks/
+├─ infra/
+│  ├─ docker-compose/
+│  ├─ observability/
+│  └─ terraform/
+│     ├─ envs/
+│     └─ modules/
+├─ libs/
+│  ├─ arch-rules/
+│  │  └─ src/
+│  ├─ common-error/
+│  │  └─ src/
+│  ├─ common-money/
+│  │  └─ src/
+│  ├─ event-contracts/
+│  │  └─ src/
+│  └─ outbox/
+│     └─ src/
+├─ load-test/
+├─ main-vpc/
+│  ├─ channel/
+│  │  └─ api-gateway/
+│  ├─ core/
+│  │  ├─ account/
+│  │  ├─ auth/
+│  │  ├─ ledger/
+│  │  ├─ payment/
+│  │  ├─ settlement/
+│  │  └─ transfer/
+│  ├─ external/
+│  │  └─ swift/
+│  └─ info/
+│     ├─ aml/
+│     └─ wealth-report/
+├─ mock-vpc/
+│  ├─ mock-clearing/
+│  │  └─ src/
+│  ├─ mock-kofiu/
+│  │  └─ src/
+│  ├─ mock-pg/
+│  │  └─ src/
+│  └─ mock-swift/
+│     └─ src/
+└─ skills/

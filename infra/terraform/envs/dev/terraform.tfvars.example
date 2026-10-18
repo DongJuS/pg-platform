@@ -1,0 +1,14 @@
+# Start with all paid components disabled. Enabling resources does NOT apply them.
+enable_nat            = false
+enable_ai_nat         = false
+ai_llm_egress_cidrs   = [] # Set provider destinations together with application hostname policy.
+enable_rds            = false
+enable_redis          = false
+enable_msk            = false
+enable_compute        = false
+enable_endpoints      = false
+enable_public_ingress = false
+# service_secret_names = { transfer = "/pg-platform/dev/transfer/db" }
+# Secret contents (username/password) are managed outside Terraform, never in this file.
+service_images       = {}
+service_secret_names = {}

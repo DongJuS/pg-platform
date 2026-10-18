@@ -1,0 +1,46 @@
+[versions]
+java = "21"
+spring-boot = "3.5.16"
+spring-cloud = "2025.0.3"
+springdoc = "2.8.17"
+archunit = "1.5.1"
+testcontainers = "1.21.4"
+msk-iam = "2.3.9"
+
+[libraries]
+boot-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
+boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+cloud-bom = { module = "org.springframework.cloud:spring-cloud-dependencies", version.ref = "spring-cloud" }
+boot-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+boot-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+boot-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+boot-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
+boot-redis = { module = "org.springframework.boot:spring-boot-starter-data-redis" }
+boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
+spring-context = { module = "org.springframework:spring-context" }
+spring-kafka = { module = "org.springframework.kafka:spring-kafka" }
+gateway = { module = "org.springframework.cloud:spring-cloud-starter-gateway-server-webflux" }
+jwt-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
+prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
+tracing-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
+otel-exporter = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
+openapi-mvc = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+openapi-webflux = { module = "org.springdoc:springdoc-openapi-starter-webflux-ui", version.ref = "springdoc" }
+postgres = { module = "org.postgresql:postgresql" }
+mariadb = { module = "org.mariadb.jdbc:mariadb-java-client" }
+flyway-core = { module = "org.flywaydb:flyway-core" }
+flyway-postgres = { module = "org.flywaydb:flyway-database-postgresql" }
+flyway-mysql = { module = "org.flywaydb:flyway-mysql" }
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+junit = { module = "org.junit.jupiter:junit-jupiter" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+tc-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+tc-junit = { module = "org.testcontainers:junit-jupiter" }
+tc-postgres = { module = "org.testcontainers:postgresql" }
+tc-kafka = { module = "org.testcontainers:kafka" }
+tc-core = { module = "org.testcontainers:testcontainers" }
+
+msk-iam = { module = "software.amazon.msk:aws-msk-iam-auth", version.ref = "msk-iam" }
+
+context-propagation = { module = "io.micrometer:context-propagation" }

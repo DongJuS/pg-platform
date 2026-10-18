@@ -1,0 +1,17 @@
+.gradle/
+**/build/
+.idea/
+*.iml
+out/
+.DS_Store
+.env
+.env.*
+!.env.example
+**/.terraform/
+*.tfstate*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+backend.hcl
+
+infra/terraform/modules/*/.terraform.lock.hcl

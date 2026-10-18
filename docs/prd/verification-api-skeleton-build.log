@@ -1,0 +1,308 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.4/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :build-logic:compilePluginsBlocks UP-TO-DATE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :build-logic:generateScriptPluginAdapters UP-TO-DATE
+> Task :build-logic:compileKotlin UP-TO-DATE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors UP-TO-DATE
+> Task :build-logic:processResources UP-TO-DATE
+> Task :build-logic:classes UP-TO-DATE
+> Task :build-logic:jar UP-TO-DATE
+> Task :assemble UP-TO-DATE
+> Task :check UP-TO-DATE
+> Task :event-contracts:compileJava NO-SOURCE
+> Task :account:generatePlatform UP-TO-DATE
+> Task :account:processResources UP-TO-DATE
+> Task :event-contracts:processResources NO-SOURCE
+> Task :event-contracts:classes UP-TO-DATE
+> Task :common-error:compileJava UP-TO-DATE
+> Task :common-money:compileJava UP-TO-DATE
+> Task :common-money:processResources NO-SOURCE
+> Task :common-error:processResources NO-SOURCE
+> Task :common-money:classes UP-TO-DATE
+> Task :common-error:classes UP-TO-DATE
+> Task :event-contracts:jar UP-TO-DATE
+> Task :common-money:jar UP-TO-DATE
+> Task :common-error:jar UP-TO-DATE
+> Task :account:processTestResources NO-SOURCE
+> Task :ai-gateway:generatePlatform UP-TO-DATE
+> Task :aml:generatePlatform UP-TO-DATE
+> Task :ai-gateway:processResources UP-TO-DATE
+> Task :aml:processResources UP-TO-DATE
+> Task :ai-gateway:processTestResources NO-SOURCE
+> Task :aml:processTestResources NO-SOURCE
+> Task :api-gateway:generatePlatform UP-TO-DATE
+> Task :auth:generatePlatform UP-TO-DATE
+> Task :arch-rules:compileJava UP-TO-DATE
+> Task :outbox:compileJava UP-TO-DATE
+> Task :auth:processResources UP-TO-DATE
+> Task :outbox:processResources UP-TO-DATE
+> Task :outbox:classes UP-TO-DATE
+> Task :outbox:jar UP-TO-DATE
+> Task :arch-rules:compileTestFixturesJava UP-TO-DATE
+> Task :arch-rules:processResources NO-SOURCE
+> Task :arch-rules:classes UP-TO-DATE
+> Task :arch-rules:jar UP-TO-DATE
+> Task :arch-rules:processTestFixturesResources NO-SOURCE
+> Task :arch-rules:testFixturesClasses UP-TO-DATE
+> Task :arch-rules:testFixturesJar UP-TO-DATE
+> Task :account:compileJava UP-TO-DATE
+> Task :account:classes UP-TO-DATE
+> Task :api-gateway:compileJava UP-TO-DATE
+> Task :api-gateway:processResources UP-TO-DATE
+> Task :api-gateway:classes UP-TO-DATE
+> Task :aml:compileJava UP-TO-DATE
+> Task :aml:classes UP-TO-DATE
+> Task :account:resolveMainClassName
+> Task :aml:resolveMainClassName
+> Task :api-gateway:resolveMainClassName
+> Task :ai-gateway:compileJava
+> Task :ai-gateway:classes
+> Task :ai-gateway:resolveMainClassName
+> Task :api-gateway:bootJar
+> Task :api-gateway:jar
+> Task :api-gateway:assemble
+> Task :aml:bootJar
+> Task :account:bootJar
+> Task :account:jar
+> Task :account:assemble
+> Task :aml:jar
+> Task :aml:assemble
+> Task :ai-gateway:bootJar
+> Task :api-gateway:compileTestJava
+> Task :api-gateway:processTestResources NO-SOURCE
+> Task :api-gateway:testClasses
+> Task :ai-gateway:jar
+> Task :ai-gateway:assemble
+> Task :account:compileTestJava
+> Task :aml:compileTestJava
+> Task :aml:testClasses
+> Task :account:testClasses
+> Task :ai-gateway:compileTestJava
+> Task :ai-gateway:testClasses
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+> Task :ai-gateway:test
+> Task :ai-gateway:check
+> Task :ai-gateway:build
+> Task :arch-rules:assemble UP-TO-DATE
+> Task :arch-rules:compileTestJava
+> Task :arch-rules:processTestResources NO-SOURCE
+> Task :arch-rules:testClasses
+> Task :account:test
+> Task :account:check
+> Task :account:build
+> Task :aml:test
+> Task :aml:check
+> Task :aml:build
+> Task :common-error:assemble UP-TO-DATE
+> Task :common-error:compileTestJava NO-SOURCE
+> Task :common-error:processTestResources NO-SOURCE
+> Task :common-error:testClasses UP-TO-DATE
+> Task :common-error:test NO-SOURCE
+> Task :common-error:check UP-TO-DATE
+> Task :common-error:build UP-TO-DATE
+> Task :common-money:assemble UP-TO-DATE
+> Task :common-money:compileTestJava UP-TO-DATE
+> Task :common-money:processTestResources NO-SOURCE
+> Task :common-money:testClasses UP-TO-DATE
+> Task :common-money:test UP-TO-DATE
+> Task :common-money:check UP-TO-DATE
+> Task :common-money:build UP-TO-DATE
+> Task :event-contracts:assemble UP-TO-DATE
+> Task :event-contracts:compileTestJava NO-SOURCE
+> Task :event-contracts:processTestResources NO-SOURCE
+> Task :event-contracts:testClasses UP-TO-DATE
+> Task :event-contracts:test NO-SOURCE
+> Task :event-contracts:check UP-TO-DATE
+> Task :event-contracts:build UP-TO-DATE
+> Task :fep-adapter:generatePlatform UP-TO-DATE
+> Task :api-gateway:test
+> Task :api-gateway:check
+> Task :api-gateway:build
+> Task :ledger:generatePlatform UP-TO-DATE
+> Task :fep-adapter:compileJava
+> Task :fep-adapter:processResources UP-TO-DATE
+> Task :fep-adapter:classes
+> Task :auth:compileJava
+> Task :auth:classes
+> Task :fep-adapter:resolveMainClassName
+> Task :auth:resolveMainClassName
+> Task :ledger:compileJava
+> Task :ledger:processResources UP-TO-DATE
+> Task :ledger:classes
+> Task :ledger:resolveMainClassName
+> Task :auth:bootJar
+> Task :fep-adapter:bootJar
+> Task :fep-adapter:jar
+> Task :ledger:bootJar
+> Task :fep-adapter:assemble
+> Task :auth:jar
+> Task :auth:assemble
+> Task :ledger:jar
+> Task :ledger:assemble
+> Task :ledger:compileTestJava
+> Task :auth:compileTestJava
+> Task :ledger:processTestResources NO-SOURCE
+> Task :ledger:testClasses
+> Task :auth:processTestResources NO-SOURCE
+> Task :auth:testClasses
+> Task :fep-adapter:compileTestJava
+> Task :fep-adapter:processTestResources NO-SOURCE
+> Task :fep-adapter:testClasses
+> Task :arch-rules:test
+> Task :arch-rules:check
+> Task :arch-rules:build
+> Task :mock-clearing:generatePlatform UP-TO-DATE
+> Task :mock-clearing:compileJava
+> Task :mock-clearing:processResources UP-TO-DATE
+> Task :mock-clearing:classes
+> Task :mock-clearing:resolveMainClassName
+> Task :mock-clearing:bootJar
+> Task :mock-clearing:jar
+> Task :mock-clearing:assemble
+> Task :mock-clearing:compileTestJava
+> Task :mock-clearing:processTestResources NO-SOURCE
+> Task :mock-clearing:testClasses
+> Task :fep-adapter:test
+> Task :mock-clearing:test
+> Task :fep-adapter:check
+> Task :mock-clearing:check
+> Task :fep-adapter:build
+> Task :mock-clearing:build
+> Task :mock-kofiu:generatePlatform UP-TO-DATE
+> Task :mock-pg:generatePlatform UP-TO-DATE
+> Task :auth:test
+> Task :auth:check
+> Task :auth:build
+> Task :mock-swift:generatePlatform UP-TO-DATE
+> Task :ledger:test
+> Task :ledger:check
+> Task :ledger:build
+> Task :outbox:assemble UP-TO-DATE
+> Task :outbox:compileTestJava UP-TO-DATE
+> Task :outbox:processTestResources NO-SOURCE
+> Task :outbox:testClasses UP-TO-DATE
+> Task :outbox:test UP-TO-DATE
+> Task :outbox:check UP-TO-DATE
+> Task :outbox:build UP-TO-DATE
+> Task :payment:generatePlatform UP-TO-DATE
+> Task :mock-pg:compileJava
+> Task :mock-swift:compileJava
+> Task :mock-pg:processResources UP-TO-DATE
+> Task :mock-pg:classes
+> Task :mock-kofiu:compileJava
+> Task :mock-swift:processResources UP-TO-DATE
+> Task :mock-swift:classes
+> Task :mock-kofiu:processResources UP-TO-DATE
+> Task :mock-kofiu:classes
+> Task :mock-pg:resolveMainClassName
+> Task :mock-kofiu:resolveMainClassName
+> Task :mock-swift:resolveMainClassName
+> Task :payment:compileJava
+> Task :payment:processResources UP-TO-DATE
+> Task :payment:classes
+> Task :payment:resolveMainClassName
+> Task :mock-pg:bootJar
+> Task :mock-pg:jar
+> Task :mock-pg:assemble
+> Task :mock-swift:bootJar
+> Task :mock-kofiu:bootJar
+> Task :mock-kofiu:jar
+> Task :mock-kofiu:assemble
+> Task :mock-swift:jar
+> Task :mock-swift:assemble
+> Task :mock-kofiu:compileTestJava
+> Task :mock-kofiu:processTestResources NO-SOURCE
+> Task :mock-kofiu:testClasses
+> Task :mock-swift:compileTestJava
+> Task :mock-swift:processTestResources NO-SOURCE
+> Task :mock-swift:testClasses
+> Task :mock-pg:compileTestJava
+> Task :mock-pg:processTestResources NO-SOURCE
+> Task :mock-pg:testClasses
+> Task :payment:bootJar
+> Task :payment:jar
+> Task :payment:assemble
+> Task :payment:compileTestJava
+> Task :payment:processTestResources NO-SOURCE
+> Task :payment:testClasses
+> Task :mock-swift:test
+> Task :mock-swift:check
+> Task :mock-swift:build
+> Task :settlement:generatePlatform UP-TO-DATE
+> Task :mock-kofiu:test
+> Task :mock-pg:test
+> Task :mock-kofiu:check
+> Task :mock-pg:check
+> Task :mock-kofiu:build
+> Task :mock-pg:build
+> Task :swift:generatePlatform UP-TO-DATE
+> Task :transfer:generatePlatform UP-TO-DATE
+> Task :swift:compileJava
+> Task :swift:processResources UP-TO-DATE
+> Task :swift:classes
+> Task :swift:resolveMainClassName
+> Task :settlement:compileJava
+> Task :settlement:processResources UP-TO-DATE
+> Task :settlement:classes
+> Task :settlement:resolveMainClassName
+> Task :transfer:compileJava
+> Task :transfer:processResources UP-TO-DATE
+> Task :transfer:classes
+> Task :transfer:resolveMainClassName
+> Task :swift:bootJar
+> Task :swift:jar
+> Task :swift:assemble
+> Task :settlement:bootJar
+> Task :settlement:jar
+> Task :settlement:assemble
+> Task :transfer:bootJar
+> Task :transfer:jar
+> Task :transfer:assemble
+> Task :swift:compileTestJava
+> Task :swift:processTestResources NO-SOURCE
+> Task :swift:testClasses
+> Task :settlement:compileTestJava
+> Task :settlement:processTestResources NO-SOURCE
+> Task :settlement:testClasses
+> Task :transfer:compileTestJava
+> Task :transfer:processTestResources NO-SOURCE
+> Task :transfer:testClasses
+> Task :payment:test
+> Task :payment:check
+> Task :payment:build
+> Task :wealth-report:generatePlatform UP-TO-DATE
+> Task :wealth-report:compileJava
+> Task :wealth-report:processResources UP-TO-DATE
+> Task :wealth-report:classes
+> Task :wealth-report:resolveMainClassName
+> Task :wealth-report:bootJar
+> Task :wealth-report:jar
+> Task :wealth-report:assemble
+> Task :wealth-report:compileTestJava
+> Task :wealth-report:processTestResources NO-SOURCE
+> Task :wealth-report:testClasses
+> Task :swift:test
+> Task :swift:check
+> Task :swift:build
+> Task :settlement:test
+> Task :settlement:check
+> Task :settlement:build
+> Task :wealth-report:test
+> Task :wealth-report:check
+> Task :wealth-report:build
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+{"@timestamp":"2026-10-18T17:22:58.377802+09:00","@version":"1","message":"Cannot reconnect to [localhost/<unresolved>:64248]: java.util.concurrent.CancellationException","logger_name":"io.lettuce.core.protocol.ConnectionWatchdog","thread_name":"SpringApplicationShutdownHook","level":"WARN","level_value":30000}
+{"@timestamp":"2026-10-18T17:22:58.384096+09:00","@version":"1","message":"HikariPool-1 - Shutdown initiated...","logger_name":"com.zaxxer.hikari.HikariDataSource","thread_name":"SpringApplicationShutdownHook","level":"INFO","level_value":20000}
+{"@timestamp":"2026-10-18T17:22:58.385153+09:00","@version":"1","message":"HikariPool-1 - Shutdown completed.","logger_name":"com.zaxxer.hikari.HikariDataSource","thread_name":"SpringApplicationShutdownHook","level":"INFO","level_value":20000}
+> Task :transfer:test
+> Task :transfer:check
+> Task :transfer:build
+> Task :build
+
+BUILD SUCCESSFUL in 15s
+155 actionable tasks: 95 executed, 60 up-to-date

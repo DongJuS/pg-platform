@@ -1,0 +1,84 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.4/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :build-logic:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :build-logic:compilePluginsBlocks UP-TO-DATE
+> Task :build-logic:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :build-logic:generateScriptPluginAdapters UP-TO-DATE
+> Task :build-logic:compileKotlin UP-TO-DATE
+> Task :build-logic:compileJava NO-SOURCE
+> Task :build-logic:pluginDescriptors UP-TO-DATE
+> Task :build-logic:processResources UP-TO-DATE
+> Task :build-logic:classes UP-TO-DATE
+> Task :build-logic:jar UP-TO-DATE
+> Task :event-contracts:compileJava NO-SOURCE
+> Task :event-contracts:processResources NO-SOURCE
+> Task :event-contracts:classes UP-TO-DATE
+> Task :event-contracts:jar UP-TO-DATE
+> Task :common-error:compileJava UP-TO-DATE
+> Task :common-error:processResources NO-SOURCE
+> Task :common-error:classes UP-TO-DATE
+> Task :common-money:compileJava UP-TO-DATE
+> Task :common-error:jar UP-TO-DATE
+> Task :common-money:processResources NO-SOURCE
+> Task :common-money:classes UP-TO-DATE
+> Task :arch-rules:compileJava UP-TO-DATE
+> Task :common-money:jar UP-TO-DATE
+> Task :transfer:generatePlatform UP-TO-DATE
+> Task :arch-rules:processResources NO-SOURCE
+> Task :arch-rules:classes UP-TO-DATE
+> Task :transfer:processResources UP-TO-DATE
+> Task :arch-rules:jar UP-TO-DATE
+> Task :transfer:processTestResources NO-SOURCE
+> Task :outbox:compileJava UP-TO-DATE
+> Task :outbox:processResources UP-TO-DATE
+> Task :outbox:classes UP-TO-DATE
+> Task :outbox:jar UP-TO-DATE
+> Task :arch-rules:compileTestFixturesJava UP-TO-DATE
+> Task :arch-rules:processTestFixturesResources NO-SOURCE
+> Task :arch-rules:testFixturesClasses UP-TO-DATE
+> Task :arch-rules:testFixturesJar UP-TO-DATE
+> Task :transfer:compileJava
+> Task :transfer:classes
+> Task :transfer:compileTestJava UP-TO-DATE
+> Task :transfer:testClasses UP-TO-DATE
+
+> Task :transfer:test FAILED
+
+ArchitectureTest > boundaries() FAILED
+    java.lang.AssertionError at ArchitectureTest.java:9
+26 actionable tasks: 2 executed, 24 up-to-date
+
+1 test completed, 1 failed
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':transfer:test'.
+> There were failing tests. See the report at: file:///Users/ddj/Documents/00_code/05_Project/sinhan_fintech/pg-platform/main-vpc/core/transfer/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+BUILD FAILED in 4s
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.shinhan.pg.transfer.ArchitectureTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-18T06:53:57.180Z" hostname="ddongui-MacBookPro.local" time="0.464">
+  <properties/>
+  <testcase name="boundaries()" classname="com.shinhan.pg.transfer.ArchitectureTest" time="0.464">
+    <failure message="java.lang.AssertionError: Architecture Violation [Priority: MEDIUM] - Rule 'classes should R5 platform boundary' was violated (1 times):&#10;R5: Field &lt;com.shinhan.pg.transfer.domain.ArchitectureRuleViolation.value&gt; has type &lt;com.shinhan.pg.account.DiagnosticForeign&gt; in (ArchitectureRuleViolation.java:0)" type="java.lang.AssertionError">java.lang.AssertionError: Architecture Violation [Priority: MEDIUM] - Rule 'classes should R5 platform boundary' was violated (1 times):
+R5: Field &lt;com.shinhan.pg.transfer.domain.ArchitectureRuleViolation.value&gt; has type &lt;com.shinhan.pg.account.DiagnosticForeign&gt; in (ArchitectureRuleViolation.java:0)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.assertNoViolation(ArchRule.java:94)
+	at com.tngtech.archunit.lang.ArchRule$Assertions.check(ArchRule.java:86)
+	at com.tngtech.archunit.lang.ArchRule$Factory$SimpleArchRule.check(ArchRule.java:165)
+	at com.shinhan.pg.common.archrules.PlatformRules.check(PlatformRules.java:54)
+	at com.shinhan.pg.transfer.ArchitectureTest.boundaries(ArchitectureTest.java:9)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+</failure>
+  </testcase>
+  <system-out><![CDATA[15:53:57.185 [Test worker] INFO com.tngtech.archunit.core.PluginLoader -- Detected Java version 21.0.12.1
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

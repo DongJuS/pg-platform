@@ -1,0 +1,13 @@
+spring:
+  reactor:
+    context-propagation: auto
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:26379}
+  application:
+    name: api-gateway
+  config:
+    import: classpath:platform-defaults.yml
+server:
+  port: ${SERVER_PORT:8080}

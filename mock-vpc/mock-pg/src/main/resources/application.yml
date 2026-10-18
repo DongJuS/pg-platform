@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: mock-pg
+  config:
+    import: classpath:platform-defaults.yml
+server:
+  port: ${SERVER_PORT:8092}

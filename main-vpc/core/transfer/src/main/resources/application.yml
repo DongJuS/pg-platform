@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: transfer
+  config:
+    import: classpath:platform-defaults.yml,classpath:platform-infra.yml
+server:
+  port: ${SERVER_PORT:8084}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:25432/transfer_db}
+    username: ${DB_USERNAME:platform_local}
+    password: ${DB_PASSWORD}

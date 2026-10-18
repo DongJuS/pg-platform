@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-18",
+  "java_build": "passed",
+  "java_test_totals": {
+    "tests": 57,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "architecture_suites": 16,
+  "skeleton_wiring_suites": 11,
+  "general_services": 11,
+  "use_cases": 22,
+  "postgres_kafka_redis_testcontainers": "passed",
+  "terraform_validate": "passed",
+  "terraform_mock_runs": 6,
+  "aws_apply_executed": false,
+  "actual_financial_behaviour_implemented": false,
+  "financial_db_atomicity_concurrency_recovery_load_verified": false,
+  "llm_client_report_timeout_enforcement_implemented": false,
+  "validation_scope": [
+    "profile isolation and dependency assembly",
+    "R1-R7 architecture rules",
+    "internal FEP client permission and external client rejection",
+    "LLM exact hostname guard",
+    "report configuration budgets",
+    "Outbox lease budget",
+    "Terraform mock routing and destination rules"
+  ],
+  "suites": [
+    {
+      "name": "com.shinhan.pg.mockswift.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.mockkofiu.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.mockclearing.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.mockpg.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.aigateway.LlmEndpointPolicyTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.aigateway.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.aigateway.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.common.commonmoney.MoneyTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.common.archrules.FepClientBoundaryTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.common.archrules.RuleDetectionTest",
+      "tests": 4
+    },
+    {
+      "name": "com.shinhan.pg.common.outbox.OutboxLeaseBudgetTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.common.outbox.OutboxRelayTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.swift.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.swift.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.wealthreport.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.wealthreport.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.wealthreport.ReportExecutionConfigurationTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.aml.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.aml.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.apigateway.filter.GatewayTraceFilterTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.apigateway.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.account.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.account.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.transfer.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.transfer.InfrastructureSmokeTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.transfer.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.transfer.adapter.in.web.PlatformWebSupportTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.payment.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.payment.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.auth.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.auth.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.settlement.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.settlement.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.ledger.ArchitectureTest",
+      "tests": 1
+    },
+    {
+      "name": "com.shinhan.pg.ledger.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.fepadapter.SkeletonWiringTest",
+      "tests": 2
+    },
+    {
+      "name": "com.shinhan.pg.fepadapter.ArchitectureTest",
+      "tests": 1
+    }
+  ],
+  "historical_snapshot": true,
+  "superseded_by": "verification-api-skeleton.json"
+}
