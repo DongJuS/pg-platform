@@ -259,6 +259,5 @@ What is not done or not proven:
 | [Architecture diagram](docs/readme/system-architecture.png) | The diagram at the top of this page ([SVG source](docs/architecture/system-architecture.svg)) |
 | `SKELETON.md` in each service | That service's APIs, files and entry points |
 | [AGENTS.md](AGENTS.md) | Review rules for AI agents working in this repository |
-| [Figma: sinhan-financial-project](https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project) | The design source of truth |
 
 ADR, PRD and API notes are kept locally under `docs/adr`, `docs/prd` and `docs/api`. They are listed in `.gitignore` and are not pushed.
