@@ -3,6 +3,7 @@
 .idea/
 *.iml
 out/
+!**/src/**/out/
 .DS_Store
 .env
 .env.*
@@ -15,3 +16,7 @@ out/
 backend.hcl
 
 infra/terraform/modules/*/.terraform.lock.hcl
+
+docs/adr/
+docs/api/
+docs/prd/
