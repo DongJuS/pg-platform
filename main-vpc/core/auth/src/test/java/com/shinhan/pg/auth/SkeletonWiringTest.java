@@ -26,7 +26,7 @@ class SkeletonWiringTest {
 
     @Test
     void explicitProfileAssemblesAllDeclaredFlows() {
-        SkeletonWiringAssertions.assembles(
+        SkeletonWiringAssertions.assemblesWithInfrastructure(
                 AuthSkeletonConfiguration.class,
                 AuthenticateUseCase.class,
                 RegisterUserUseCase.class,
