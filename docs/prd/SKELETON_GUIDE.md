@@ -72,4 +72,11 @@
 
 전체 빌드 **69개 테스트 통과**, 실패/오류/skip 0. 개발용 경로 36개, 보류 API 5개의 비노출, 기본 프로필 비활성, HTTP 501/400, 53개 유스케이스 조립, R1~R7, 기존 PostgreSQL/Kafka/Redis Testcontainers 검사를 확인했다. 금융 정합성·실제 동시 출금·목표 처리량 검증은 아니다.
 
+### 2026-10-18 스켈레톤 갭 점검
+
+- 77개 기능 ID를 소스와 대조했다. 게이트웨이의 CMN-F02·MVP2-F10·MVP2-F11만 소스 주석에 없어 GatewayRoutesConfiguration·GatewayJwtFilter·GatewayRateLimitFilter·InternalPathBlockFilter에 기능 ID와 구현 범위·미정 항목을 추가했다(라우팅 동작 변경 없음). 나머지 74개는 소스에서 추적 가능하다.
+- transfer의 최초 스캐폴드 잔재 `domain/TransferErrorCode`(공통 ErrorCode 구현 예시)가 `domain/error/TransferErrorCode`(업무 오류 초안)와 중복이고 참조가 없어 삭제했다.
+- 체크리스트 참조 파일 147개·api-skeleton-files.json 544개 전부 실제 존재, 보류 5개 매핑 비활성, skeleton 프로필 활성 매핑 36개를 재확인했다.
+- Figma 프레임은 인증 없이 접근할 수 없어 확인하지 못했다. 게이트웨이 헬스·메트릭 범위 등 Figma 의존 항목은 소스 주석에 'Figma 프레임 확인 필요'로 표기했다. ADR 확정 결정과 코드·문서의 일치는 로컬로 검증했다.
+
 [검증 결과](verification-api-skeleton.json) · [빌드 기록](verification-api-skeleton-build.log) · [파일 목록](api-skeleton-files.json)
