@@ -1,5 +1,7 @@
 package com.shinhan.pg.auth.application.service;
 
+import com.shinhan.pg.auth.domain.security.CryptoSupport;
+import com.shinhan.pg.auth.domain.security.TotpMock;
 import com.shinhan.pg.auth.application.command.AuthenticateCommand;
 import com.shinhan.pg.auth.application.command.GetCurrentUserCommand;
 import com.shinhan.pg.auth.application.command.LogoutCommand;
@@ -23,13 +25,28 @@ import com.shinhan.pg.auth.application.result.GetCurrentUserResult;
 import com.shinhan.pg.auth.application.result.RefreshTokenResult;
 import com.shinhan.pg.auth.application.result.RegisterUserResult;
 import com.shinhan.pg.auth.application.result.VerifyOtpResult;
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+import com.shinhan.pg.auth.domain.error.AuthErrorCode;
+import com.shinhan.pg.auth.domain.model.OtpProof;
+import com.shinhan.pg.auth.domain.model.RefreshSession;
+import com.shinhan.pg.auth.domain.model.User;
+import com.shinhan.pg.auth.domain.policy.OtpVerificationPolicy;
+import com.shinhan.pg.auth.domain.policy.PasswordPolicy;
+import com.shinhan.pg.auth.domain.policy.RefreshRotationPolicy;
+import com.shinhan.pg.common.commonerror.ApplicationException;
 
-/** 기능별 계약과 TODO를 모은 application 구현 자리.
- * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * 현재 모든 업무 메서드는 명시적 미구현 예외를 던지며 성공 DTO·가짜 금융 결과를 반환하지 않는다.
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * [MVP1-F01..F06] 인증 업무 구현. Controller는 이 클래스가 구현하는 input port만 호출한다.
+ * access 토큰은 RS256 JWT, refresh는 불투명 토큰(SHA-256 해시 저장)이며 회전·재사용 탐지를 적용한다.
+ * 로그인 rate limit의 Redis 카운터는 후속 계약으로 남긴다(재시도 억제는 OTP 잠금으로 우선 적용).
  */
-public final class AuthApplicationService
+public class AuthApplicationService
         implements AuthenticateUseCase,
                 RegisterUserUseCase,
                 RefreshTokenUseCase,
@@ -42,6 +59,12 @@ public final class AuthApplicationService
     private final UserRepository userRepository;
     private final RefreshSessionRepository refreshSessionRepository;
     private final OtpProofRepository otpProofRepository;
+    private final PasswordPolicy passwordPolicy;
+    private final RefreshRotationPolicy refreshRotationPolicy;
+    private final OtpVerificationPolicy otpVerificationPolicy;
+    private final byte[] otpServerSecret;
+    private final Duration refreshTokenTtl;
+    private final Duration otpTokenTtl;
 
     public AuthApplicationService(
             PasswordHashPort passwordHashPort,
@@ -49,182 +72,222 @@ public final class AuthApplicationService
             RevokedTokenStorePort revokedTokenStorePort,
             UserRepository userRepository,
             RefreshSessionRepository refreshSessionRepository,
-            OtpProofRepository otpProofRepository) {
+            OtpProofRepository otpProofRepository,
+            byte[] otpServerSecret,
+            Duration refreshTokenTtl,
+            Duration otpTokenTtl) {
         this.passwordHashPort = java.util.Objects.requireNonNull(passwordHashPort);
         this.tokenIssuancePort = java.util.Objects.requireNonNull(tokenIssuancePort);
         this.revokedTokenStorePort = java.util.Objects.requireNonNull(revokedTokenStorePort);
         this.userRepository = java.util.Objects.requireNonNull(userRepository);
         this.refreshSessionRepository = java.util.Objects.requireNonNull(refreshSessionRepository);
         this.otpProofRepository = java.util.Objects.requireNonNull(otpProofRepository);
+        this.passwordPolicy = new PasswordPolicy();
+        this.refreshRotationPolicy = new RefreshRotationPolicy();
+        this.otpVerificationPolicy = new OtpVerificationPolicy();
+        this.otpServerSecret = otpServerSecret.clone();
+        this.refreshTokenTtl = java.util.Objects.requireNonNull(refreshTokenTtl);
+        this.otpTokenTtl = java.util.Objects.requireNonNull(otpTokenTtl);
     }
 
     /**
      * <pre>
-     * [MVP1-F02] 로그인
-     * API 초안: POST /api/v1/auth/login
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 없음 / PUBLIC
-     * 입력 근거: 이메일, 비밀번호
-     * 출력 근거: accessToken, refreshToken, 만료 시각
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 401 자격증명 오류, 429 요청 과다
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. JWT RS256 서명, 실패 횟수 집계(Redis rate limit)
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://app.notion.com/p/3faad9292a4981c69805e570fa72cf1b
+     * [MVP1-F01] 회원가입. 이메일 고유 + 비밀번호 정책 검사 후 PBKDF2 해시 저장.
+     * 오류: 409 EMAIL_ALREADY_EXISTS, 401 INVALID_CREDENTIALS(비밀번호 규칙 위반 — TODO[CONTRACT] 400 계약 후보).
      * </pre>
      */
     @Override
-    public AuthenticateResult authenticate(AuthenticateCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: JWT RS256 서명, 실패 횟수 집계(Redis rate limit)
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F02");
-    }
-
-    /**
-     * <pre>
-     * [MVP1-F01] 회원가입
-     * API 초안: POST /api/v1/auth/register
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 없음 / PUBLIC
-     * 입력 근거: 이메일, 비밀번호, 이름, 전화번호
-     * 출력 근거: userId
-     * 정상 응답 후보: 201 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 409 이메일 중복, 400 비밀번호 규칙 위반
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. 이메일 중복 차단, 비밀번호 BCrypt 해시 저장
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://app.notion.com/p/3faad9292a4981ee85fdfeca462ac388
-     * </pre>
-     */
-    @Override
+    @Transactional
     public RegisterUserResult registerUser(RegisterUserCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 이메일 중복 차단, 비밀번호 BCrypt 해시 저장
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F01");
+        passwordPolicy.validatePassword(command.password());
+        passwordPolicy.validateNotDerivedFromEmail(command.password(), command.email());
+        userRepository
+                .findByEmail(command.email())
+                .ifPresent(
+                        existing -> {
+                            throw new ApplicationException(AuthErrorCode.EMAIL_ALREADY_EXISTS);
+                        });
+        var user =
+                new User(
+                        UUID.randomUUID(),
+                        command.email(),
+                        passwordHashPort.hash(command.password()),
+                        command.name(),
+                        command.phoneNumber(),
+                        List.of("USER"));
+        userRepository.save(user);
+        return new RegisterUserResult(user.id());
     }
 
     /**
      * <pre>
-     * [MVP1-F03] 토큰 재발급
-     * API 초안: POST /api/v1/auth/refresh
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 없음 / PUBLIC
-     * 입력 근거: refreshToken
-     * 출력 근거: 새 accessToken, refreshToken
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 401 만료·철회 토큰
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. refresh 회전, 재사용 감지 시 전체 철회
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://app.notion.com/p/3faad9292a498100bb77d2811deb087f
+     * [MVP1-F02] 로그인. 자격증명 확인 후 access JWT 발급 + refresh 세션 생성(새 family).
+     * 오류: 401 INVALID_CREDENTIALS.
      * </pre>
      */
     @Override
-    public RefreshTokenResult refreshToken(RefreshTokenCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: refresh 회전, 재사용 감지 시 전체 철회
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F03");
+    @Transactional
+    public AuthenticateResult authenticate(AuthenticateCommand command) {
+        var user =
+                userRepository
+                        .findByEmail(command.email())
+                        .orElseThrow(
+                                () -> new ApplicationException(AuthErrorCode.INVALID_CREDENTIALS));
+        if (!passwordHashPort.matches(command.password(), user.passwordHash())) {
+            throw new ApplicationException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+        var access = tokenIssuancePort.issueAccessToken(user.id());
+        var refresh = issueRefreshSession(user.id(), UUID.randomUUID());
+        return new AuthenticateResult(
+                access.token(), refresh.token(), access.expiresAt(), refresh.expiresAt());
     }
 
     /**
      * <pre>
-     * [MVP1-F04] 로그아웃
-     * API 초안: POST /api/v1/auth/logout
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 사용자 JWT / PUBLIC
-     * 입력 근거: accessToken
-     * 출력 근거: 204
-     * 정상 응답 후보: 204 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: —
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. 토큰 jti를 Redis 철회 목록에 만료 시각까지 저장
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO: 기본 로그아웃은 access jti 철회다. refresh 세션 전체 철회·전체 기기 로그아웃(MVP1-F18)은 보류하며 이 메서드에 자동 추가하지 않는다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://app.notion.com/p/3faad9292a49816c96c5d41e6ffbcb52
+     * [MVP1-F03] 토큰 재발급. refresh 회전 + 재사용 감지 시 family 전체 철회.
+     * 오류: 401 INVALID_CREDENTIALS, 409 TOKEN_REUSED.
+     * </pre>
+     */
+    @Override
+    @Transactional
+    public RefreshTokenResult refreshToken(RefreshTokenCommand command) {
+        var now = Instant.now();
+        var session =
+                refreshSessionRepository
+                        .findByTokenHash(CryptoSupport.sha256Hex(command.refreshToken()))
+                        .orElseThrow(
+                                () -> new ApplicationException(AuthErrorCode.INVALID_CREDENTIALS));
+        if (session.revokedAt() != null) {
+            refreshSessionRepository.revokeFamily(session.familyId(), now);
+            throw new ApplicationException(AuthErrorCode.TOKEN_REUSED);
+        }
+        refreshRotationPolicy.validateRotation(session, now);
+        refreshSessionRepository.save(revoked(session, now));
+        var access = tokenIssuancePort.issueAccessToken(session.userId());
+        var rotated = issueRefreshSession(session.userId(), session.familyId());
+        return new RefreshTokenResult(
+                access.token(), rotated.token(), access.expiresAt(), rotated.expiresAt());
+    }
+
+    /**
+     * <pre>
+     * [MVP1-F04] 로그아웃. access jti를 남은 만료 시간만큼 Redis 철회 목록에 저장한다.
+     * 서명이 유효하지 않은 토큰은 철회할 수 없으므로 멱등하게 성공 처리한다(계약 초안).
      * </pre>
      */
     @Override
     public void logout(LogoutCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 토큰 jti를 Redis 철회 목록에 만료 시각까지 저장
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F04");
+        if (command.authorization() == null || !command.authorization().startsWith("Bearer ")) {
+            return;
+        }
+        try {
+            var verified =
+                    tokenIssuancePort.verifyAccessToken(
+                            command.authorization().substring("Bearer ".length()));
+            revokedTokenStorePort.revokeUntilExpiry(verified.jti(), verified.expiresAt());
+        } catch (RuntimeException invalidToken) {
+            // TODO[CONTRACT]: 유효하지 않은 토큰의 로그아웃 응답(204 vs 401)은 최종 계약 후 조정한다.
+        }
     }
 
-    /**
-     * <pre>
-     * [MVP1-F05] 내 정보 조회
-     * API 초안: GET /api/v1/users/me
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 사용자 JWT / PUBLIC
-     * 입력 근거: —
-     * 출력 근거: userId, 이름, 권한
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 401
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. 토큰의 userId로만 조회
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://app.notion.com/p/3faad9292a4981019060eb224973005c
-     * </pre>
-     */
+    /** [MVP1-F05] 내 정보 조회. 오류: 404 USER_NOT_FOUND. */
     @Override
+    @Transactional(readOnly = true)
     public GetCurrentUserResult getCurrentUser(GetCurrentUserCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 토큰의 userId로만 조회
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F05");
+        var user =
+                userRepository
+                        .findById(command.actorUserId())
+                        .orElseThrow(
+                                () -> new ApplicationException(AuthErrorCode.USER_NOT_FOUND));
+        return new GetCurrentUserResult(user.id(), user.name(), user.roles());
     }
 
     /**
      * <pre>
-     * [MVP1-F06] 이체 OTP 확인
-     * API 초안: POST /api/v1/auth/otp/verify
-     * 상태: 신규 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 사용자 JWT / PUBLIC
-     * 입력 근거: transferDraftId, otpCode
-     * 출력 근거: otpToken(1회용)
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 401 불일치, 423 잠금
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. Mock OTP 검증, 실패 횟수 누적
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO: 실제 OTP 제공사 연동이 아니라 Mock OTP다. proof의 유효시간·소모 조건은 후속 계약이다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project?node-id=19-2
+     * [MVP1-F06] 이체 OTP 확인. Mock TOTP(±1 단계) 검증, 실패 시 횟수 누적, 성공 시 일회 소모 기록과
+     * otpToken(만료 otpTokenTtl) 발급. 오류: 401 OTP_INVALID, 403 OTP_LOCKED(계약 초안 423 대체 — TODO[CONTRACT]).
      * </pre>
      */
     @Override
+    @Transactional
     public VerifyOtpResult verifyOtp(VerifyOtpCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: Mock OTP 검증, 실패 횟수 누적
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F06");
+        var now = Instant.now();
+        var current =
+                otpProofRepository.findLatestByUserIdAndTransferDraftId(
+                        command.actorUserId(), command.transferDraftId());
+        otpVerificationPolicy.ensureNotLocked(command.transferDraftId(), current, now);
+        current.ifPresent(
+                proof ->
+                        otpVerificationPolicy.validateProof(
+                                proof, command.transferDraftId(), now));
+
+        var seed = TotpMock.seedFor(otpServerSecret, command.actorUserId());
+        if (!TotpMock.verify(seed, command.otpCode(), now, 1)) {
+            var failed =
+                    current
+                            .map(proof -> proof.withFailure(proof.failureCount() + 1))
+                            .orElseGet(
+                                    () ->
+                                            new OtpProof(
+                                                    UUID.randomUUID(),
+                                                    command.actorUserId(),
+                                                    command.transferDraftId(),
+                                                    CryptoSupport.sha256Hex(
+                                                            "otp-attempt:" + UUID.randomUUID()),
+                                                    now.plus(otpTokenTtl),
+                                                    null,
+                                                    1));
+            otpProofRepository.save(failed);
+            throw new ApplicationException(AuthErrorCode.OTP_INVALID);
+        }
+
+        var expiresAt = now.plus(otpTokenTtl);
+        var proof =
+                new OtpProof(
+                        UUID.randomUUID(),
+                        command.actorUserId(),
+                        command.transferDraftId(),
+                        CryptoSupport.sha256Hex("otp-proof:" + UUID.randomUUID()),
+                        expiresAt,
+                        now,
+                        0);
+        otpProofRepository.save(proof);
+        return new VerifyOtpResult(otpToken(proof.id(), expiresAt), expiresAt);
     }
+
+    private RefreshTokenSession issueRefreshSession(UUID userId, UUID familyId) {
+        var token = CryptoSupport.randomToken();
+        var expiresAt = Instant.now().plus(refreshTokenTtl);
+        refreshSessionRepository.save(
+                new RefreshSession(
+                        UUID.randomUUID(),
+                        userId,
+                        CryptoSupport.sha256Hex(token),
+                        familyId,
+                        expiresAt,
+                        null));
+        return new RefreshTokenSession(token, expiresAt);
+    }
+
+    private RefreshSession revoked(RefreshSession session, Instant at) {
+        return new RefreshSession(
+                session.id(),
+                session.userId(),
+                session.tokenHash(),
+                session.familyId(),
+                session.expiresAt(),
+                at);
+    }
+
+    private String otpToken(UUID proofId, Instant expiresAt) {
+        var body = proofId + "." + expiresAt.getEpochSecond();
+        var encoded =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var signature = CryptoSupport.hmacSha256Hex(otpServerSecret, "otp-token:" + body);
+        return "v1." + encoded + "." + signature;
+    }
+
+    private record RefreshTokenSession(String token, Instant expiresAt) {}
 }
