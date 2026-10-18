@@ -1,7 +1,7 @@
 # pg-platform
 
 <p align="center">
-  <img src="docs/architecture/system-architecture.svg" width="100%" alt="pg-platform system architecture. Users reach an Application Load Balancer and api-gateway in the main VPC. The main VPC holds the channel, core, information and external layers and a data subnet with PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC stands in for external institutions.">
+  <img src="docs/readme/system-architecture.png" width="100%" alt="pg-platform system architecture. Users reach an Application Load Balancer and api-gateway in the main VPC. The main VPC holds the channel, core, information and external layers and a data subnet with PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC stands in for external institutions.">
 </p>
 
 pg-platform is a payment and banking platform laid out the way a Korean bank splits its systems. A channel layer faces customers, a core layer owns accounts and the ledger, an external layer handles overseas messages, and an information layer runs reports and anti-money-laundering checks. Every request to an outside institution leaves through one front-end processor (FEP), and every request to an outside AI model leaves through a separate AI gateway.
@@ -99,7 +99,7 @@ pg-platform/
 │  └─ observability/  Prometheus, Grafana and Collector config
 ├─ build-logic/   convention plugins, shared web templates, shared config
 ├─ load-test/     architecture mutation check (business load scenarios are TODO)
-└─ docs/          architecture diagram (ADR, PRD and API notes stay local)
+└─ docs/          architecture (diagram source), readme (README images); ADR, PRD and API notes stay local
 ```
 
 Inside a service, the layers come first (domain-driven design with ports and adapters). The package root is `com.shinhan.pg.<service>`.
@@ -256,7 +256,7 @@ What is not done or not proven:
 
 | Document | What it covers |
 | --- | --- |
-| [Architecture diagram](docs/architecture/system-architecture.svg) | The diagram at the top of this page |
+| [Architecture diagram](docs/readme/system-architecture.png) | The diagram at the top of this page ([SVG source](docs/architecture/system-architecture.svg)) |
 | `SKELETON.md` in each service | That service's APIs, files and entry points |
 | [AGENTS.md](AGENTS.md) | Review rules for AI agents working in this repository |
 | [Figma: sinhan-financial-project](https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project) | The design source of truth |
