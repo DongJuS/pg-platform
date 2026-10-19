@@ -12,6 +12,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Test local operations REST API contracts
+        run: python3 -m unittest discover -s infra/docker -p 'test_ops_api.py' -v
       - run: ./gradlew build -Pintegration=true --no-daemon
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
@@ -27,3 +29,53 @@ jobs:
             terraform -chdir="infra/terraform/modules/$module" init -backend=false -lockfile=readonly
             terraform -chdir="infra/terraform/modules/$module" test
           done
+
+  # CMN-F03: package all 16 services as Docker images (build only, no push).
+  # The Docker image is the deployment unit; tags are immutable (git SHA).
+  docker-images:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Build bootJars and package 16 service images
+        # scripts/build-images.sh runs `./gradlew :<svc>:bootJar -x test` for
+        # every service in infra/docker/services.tsv, then
+        # `docker build -f infra/docker/Dockerfile.service --build-arg JAR_PATH=...`
+        # tagged pg-platform/<service>:${GITHUB_SHA::8}. Nothing is pushed.
+        run: bash scripts/build-images.sh --tag "${GITHUB_SHA::8}"
+      - name: List built images
+        run: docker image ls 'pg-platform/*'
+
+  # Future (AWS readiness): push immutable tags to ECR and roll ECS services.
+  # Disabled on purpose until AWS credentials/environments are approved.
+  # Enable by removing `if: ${{ false }}` and uncommenting the steps.
+  ecr-push-ecs-deploy:
+    if: ${{ false }}
+    needs: docker-images
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # future OIDC role assumption
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # - uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::<account-id>:role/pg-platform-ci
+      #     aws-region: <region>
+      # - uses: aws-actions/amazon-ecr-login@v2
+      # - name: Build and push immutable tags to ECR
+      #   run: |
+      #     export IMAGE_REGISTRY="<account-id>.dkr.ecr.<region>.amazonaws.com/pg-platform"
+      #     bash scripts/build-images.sh --tag "${GITHUB_SHA::8}" --push
+      # - name: Deploy to ECS Fargate (per service)
+      #   run: |
+      #     for svc in api-gateway auth account ledger transfer payment settlement swift \
+      #       wealth-report aml ai-gateway fep-adapter mock-pg mock-swift mock-kofiu mock-clearing; do
+      #       aws ecs update-service --cluster pg-platform --service "$svc" --force-new-deployment
+      #     done
+      - run: echo "Placeholder job — disabled until the AWS readiness checklist is done."
