@@ -20,7 +20,7 @@ class SkeletonWiringTest {
 
     @Test
     void explicitProfileAssemblesAllDeclaredFlows() {
-        SkeletonWiringAssertions.assembles(
+        SkeletonWiringAssertions.assemblesWithInfrastructure(
                 SwiftSkeletonConfiguration.class,
                 SubmitSwiftUseCase.class,
                 RetrySwiftUseCase.class,
