@@ -1,4 +1,30 @@
 name: pg-platform-local
+
+# Shared environment blocks for the platform services. These names are the ones the
+# service application.yml files and build-logic shared resources actually read.
+x-otel-env: &otel-env
+  OTEL_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+  TRACE_SAMPLING_PROBABILITY: "1.0"
+
+x-infra-env: &infra-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+
+# Base tuning for the actuator healthcheck. The per-service `test` line still has to be
+# set because the container port differs per service.
+x-hc-base: &hc-base
+  interval: 10s
+  timeout: 5s
+  retries: 30
+  start_period: 40s
+
+# Image build contract. infra/docker/Dockerfile.service and its JAR_PATH build arg are
+# owned by another workstream; the path and the ARG name are fixed by contract.
+x-service-build: &service-build
+  context: "../.."
+  dockerfile: infra/docker/Dockerfile.service
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -75,6 +101,18 @@ services:
       interval: 3s
       retries: 40
     mem_limit: 512m
+  kafka-init:
+    # Creates the event topics because KAFKA_AUTO_CREATE_TOPICS_ENABLE=false.
+    # Idempotent: --create --if-not-exists. Uses the JVM image because the
+    # apache/kafka-native broker image ships no CLI scripts.
+    image: apache/kafka:3.9.1
+    entrypoint: [/bin/sh, /init/kafka-topics.sh]
+    environment:
+      KAFKA_HEAP_OPTS: -Xms32m -Xmx96m
+    volumes: ["./kafka-topics.sh:/init/kafka-topics.sh:ro"]
+    depends_on:
+      kafka: {condition: service_healthy}
+    mem_limit: 192m
   prometheus:
     image: prom/prometheus:v3.5.0
     ports: ["127.0.0.1:29090:9090"]
@@ -98,47 +136,392 @@ services:
     ports: ["127.0.0.1:24317:4317", "127.0.0.1:24318:4318"]
     volumes: ["../observability/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro"]
     mem_limit: 192m
-  transfer:
-    profiles: [smoke]
-    image: eclipse-temurin:21-jre-alpine
-    working_dir: /app
-    command: [java, -XX:MaxRAMPercentage=65, -jar, /app/app.jar]
-    ports: ["127.0.0.1:18084:8084"]
-    volumes: ["../../main-vpc/core/transfer/build/libs/transfer-0.1.0-SNAPSHOT.jar:/app/app.jar:ro"]
+  alertmanager:
+    # Config file is owned by another workstream (contract path). The `observability`
+    # profile keeps the default startup working until the file exists.
+    profiles: [observability]
+    image: prom/alertmanager:v0.34.1
+    ports: ["127.0.0.1:29093:9093"]
+    volumes:
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
+    mem_limit: 64m
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:2.10.8
+    command: ["-config.file=/etc/tempo.yml"]
+    ports: ["127.0.0.1:23200:3200"]
+    volumes:
+      - ../observability/tempo.yml:/etc/tempo.yml:ro
+      - tempodata:/var/tempo
+    mem_limit: 256m
+  loki:
+    profiles: [observability]
+    image: grafana/loki:3.6.18
+    command: ["-config.file=/etc/loki/loki.yml"]
+    ports: ["127.0.0.1:23100:3100"]
+    volumes:
+      - ../observability/loki.yml:/etc/loki/loki.yml:ro
+      - lokidata:/loki
+    mem_limit: 256m
+  promtail:
+    profiles: [observability]
+    image: grafana/promtail:3.6.11
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes:
+      - ../observability/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtaildata:/data
+    depends_on:
+      loki: {condition: service_started}
+    mem_limit: 64m
+  localstack:
+    # Local stand-in for Amazon S3 (wealth-report report PDFs). S3 only.
+    image: localstack/localstack:3
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/transfer_db
+      SERVICES: s3
+      PERSISTENCE: "1"
+    ports: ["127.0.0.1:24566:4566"]
+    volumes: ["localstackdata:/var/lib/localstack"]
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"' || curl -fsS http://localhost:4566/_localstack/health | grep -q '\"s3\": \"running\"'"]
+      interval: 3s
+      retries: 40
+    mem_limit: 512m
+  localstack-init:
+    # Creates the local report bucket. Idempotent: head-bucket check before mb.
+    image: localstack/localstack:3
+    entrypoint: [/bin/sh, /init/s3-init.sh]
+    environment:
+      REPORT_BUCKET: ${REPORT_BUCKET:-pg-platform-local-reports}
+      LOCALSTACK_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-2
+    volumes: ["./s3-init.sh:/init/s3-init.sh:ro"]
+    depends_on:
+      localstack: {condition: service_healthy}
+    mem_limit: 64m
+
+  # ---------------------------------------------------------------------------
+  # Platform services (profile: platform). Image build contract:
+  #   image: pg-platform/<service>:local
+  #   build: infra/docker/Dockerfile.service with JAR_PATH=<module>/build/libs/<service>-0.1.0-SNAPSHOT.jar
+  # transfer/account keep their smoke/db-smoke profiles so the existing README flows
+  # keep working with the same service names.
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    profiles: [platform]
+    image: pg-platform/api-gateway:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/channel/api-gateway/build/libs/api-gateway-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18080:8080"]
+    environment:
+      <<: *otel-env
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8080/actuator/health | grep -q UP || wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  auth:
+    profiles: [platform]
+    image: pg-platform/auth:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/auth/build/libs/auth-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18081:8081"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/auth_db
       DB_USERNAME: platform_local
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      OTEL_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
-      TRACE_SAMPLING_PROBABILITY: 1.0
     depends_on:
       postgres: {condition: service_healthy}
-      kafka: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8081/actuator/health | grep -q UP || wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
     mem_limit: 512m
   account:
-    profiles: [db-smoke]
-    image: eclipse-temurin:21-jre-alpine
-    working_dir: /app
-    command: [java, -XX:MaxRAMPercentage=65, -jar, /app/app.jar]
+    profiles: [db-smoke, platform]
+    image: pg-platform/account:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/account/build/libs/account-0.1.0-SNAPSHOT.jar
     ports: ["127.0.0.1:18082:8082"]
-    volumes: ["../../main-vpc/core/account/build/libs/account-0.1.0-SNAPSHOT.jar:/app/app.jar:ro"]
     environment:
+      <<: [*otel-env, *infra-env]
       DB_URL: jdbc:mariadb://mariadb:3306/account_db
       DB_USERNAME: root
       DB_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      OTEL_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
     depends_on:
       mariadb: {condition: service_healthy}
-      kafka: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8082/actuator/health | grep -q UP || wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
     mem_limit: 512m
+  ledger:
+    profiles: [platform]
+    image: pg-platform/ledger:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/ledger/build/libs/ledger-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18083:8083"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:mariadb://mariadb:3306/ledger_db
+      DB_USERNAME: root
+      DB_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    depends_on:
+      mariadb: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8083/actuator/health | grep -q UP || wget -qO- http://localhost:8083/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  transfer:
+    profiles: [smoke, platform]
+    image: pg-platform/transfer:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/transfer/build/libs/transfer-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18084:8084"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/transfer_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8084/actuator/health | grep -q UP || wget -qO- http://localhost:8084/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  payment:
+    profiles: [platform]
+    image: pg-platform/payment:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/payment/build/libs/payment-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18085:8085"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/payment_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8085/actuator/health | grep -q UP || wget -qO- http://localhost:8085/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  settlement:
+    profiles: [platform]
+    image: pg-platform/settlement:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/core/settlement/build/libs/settlement-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18086:8086"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/settlement_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8086/actuator/health | grep -q UP || wget -qO- http://localhost:8086/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  swift:
+    profiles: [platform]
+    image: pg-platform/swift:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/external/swift/build/libs/swift-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18087:8087"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/swift_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8087/actuator/health | grep -q UP || wget -qO- http://localhost:8087/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  wealth-report:
+    profiles: [platform]
+    image: pg-platform/wealth-report:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/info/wealth-report/build/libs/wealth-report-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18088:8088"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/wealth_report_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      localstack-init: {condition: service_completed_successfully}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8088/actuator/health | grep -q UP || wget -qO- http://localhost:8088/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  aml:
+    profiles: [platform]
+    image: pg-platform/aml:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: main-vpc/info/aml/build/libs/aml-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18089:8089"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/aml_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8089/actuator/health | grep -q UP || wget -qO- http://localhost:8089/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  ai-gateway:
+    profiles: [platform]
+    image: pg-platform/ai-gateway:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: ai-vpc/ai-gateway/build/libs/ai-gateway-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18090:8090"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/ai_gateway_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8090/actuator/health | grep -q UP || wget -qO- http://localhost:8090/actuator/health | grep -q UP"]
+    mem_limit: 512m
+  fep-adapter:
+    profiles: [platform]
+    image: pg-platform/fep-adapter:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: fep-vpc/fep-adapter/build/libs/fep-adapter-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18091:8091"]
+    environment:
+      <<: [*otel-env, *infra-env]
+      DB_URL: jdbc:postgresql://postgres:5432/fep_adapter_db
+      DB_USERNAME: platform_local
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8091/actuator/health | grep -q UP || wget -qO- http://localhost:8091/actuator/health | grep -q UP"]
+    mem_limit: 512m
+
+  # ---------------------------------------------------------------------------
+  # External institution simulators (profile: mocks). They have no database,
+  # Kafka or Redis dependency.
+  # ---------------------------------------------------------------------------
+  mock-pg:
+    profiles: [mocks]
+    image: pg-platform/mock-pg:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: mock-vpc/mock-pg/build/libs/mock-pg-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18100:8092"]
+    environment:
+      <<: *otel-env
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8092/actuator/health | grep -q UP || wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
+    mem_limit: 256m
+  mock-swift:
+    profiles: [mocks]
+    image: pg-platform/mock-swift:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: mock-vpc/mock-swift/build/libs/mock-swift-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18101:8093"]
+    environment:
+      <<: *otel-env
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8093/actuator/health | grep -q UP || wget -qO- http://localhost:8093/actuator/health | grep -q UP"]
+    mem_limit: 256m
+  mock-kofiu:
+    profiles: [mocks]
+    image: pg-platform/mock-kofiu:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: mock-vpc/mock-kofiu/build/libs/mock-kofiu-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18102:8094"]
+    environment:
+      <<: *otel-env
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8094/actuator/health | grep -q UP || wget -qO- http://localhost:8094/actuator/health | grep -q UP"]
+    mem_limit: 256m
+  mock-clearing:
+    profiles: [mocks]
+    image: pg-platform/mock-clearing:local
+    build:
+      <<: *service-build
+      args:
+        JAR_PATH: mock-vpc/mock-clearing/build/libs/mock-clearing-0.1.0-SNAPSHOT.jar
+    ports: ["127.0.0.1:18103:8095"]
+    environment:
+      <<: *otel-env
+    healthcheck:
+      <<: *hc-base
+      test: [CMD-SHELL, "curl -fsS http://localhost:8095/actuator/health | grep -q UP || wget -qO- http://localhost:8095/actuator/health | grep -q UP"]
+    mem_limit: 256m
+
 volumes:
   pgdata:
   mariadbdata:
@@ -146,3 +529,8 @@ volumes:
   kafkadata:
   prometheusdata:
   grafanadata:
+  alertmanagerdata:
+  tempodata:
+  lokidata:
+  promtaildata:
+  localstackdata:

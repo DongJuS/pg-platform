@@ -1,0 +1,13 @@
+# BuildKit picks up this file automatically for Dockerfile.service
+# (Dockerfile-specific ignore: <dockerfile-name>.dockerignore).
+#
+# The service image only needs the Gradle-built bootJars from the repository
+# root context. Exclude everything else to keep the context small and to make
+# sure no secrets, credentials or local config ever reach an image layer.
+**
+# Re-include only the service bootJars (verified working with BuildKit;
+# `-plain.jar` variants are never selected because JAR_PATH is explicit).
+!main-vpc/**/build/libs/*.jar
+!ai-vpc/**/build/libs/*.jar
+!fep-vpc/**/build/libs/*.jar
+!mock-vpc/**/build/libs/*.jar

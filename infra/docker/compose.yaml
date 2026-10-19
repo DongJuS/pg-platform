@@ -1,0 +1,528 @@
+# Standalone addition: do not combine this file with infra/docker-compose/compose.yaml.
+name: sinhan_project_docker
+
+x-image-build: &image-build
+  context: ../..
+  dockerfile: infra/docker/Dockerfile
+  target: runtime
+
+x-app-environment: &app-environment
+  SPRING_PROFILES_ACTIVE: docker,skeleton
+  SPRING_CONFIG_ADDITIONAL_LOCATION: file:/config/
+  KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  OTEL_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+  AUTH_BASE_URL: ${AUTH_BASE_URL:-http://auth:8081}
+  ACCOUNT_BASE_URL: ${ACCOUNT_BASE_URL:-http://account:8082}
+  LEDGER_BASE_URL: ${LEDGER_BASE_URL:-http://ledger:8083}
+  TRANSFER_BASE_URL: ${TRANSFER_BASE_URL:-http://transfer:8084}
+  PAYMENT_BASE_URL: ${PAYMENT_BASE_URL:-http://payment:8085}
+  SETTLEMENT_BASE_URL: ${SETTLEMENT_BASE_URL:-http://settlement:8086}
+  SWIFT_BASE_URL: ${SWIFT_BASE_URL:-http://swift:8087}
+  WEALTH_REPORT_BASE_URL: ${WEALTH_REPORT_BASE_URL:-http://wealth-report:8088}
+  AML_BASE_URL: ${AML_BASE_URL:-http://aml:8089}
+  AI_GATEWAY_BASE_URL: ${AI_GATEWAY_BASE_URL:-http://ai-gateway:8090}
+  FEP_BASE_URL: ${FEP_BASE_URL:-http://fep-adapter:8091}
+  MOCK_PG_BASE_URL: ${MOCK_PG_BASE_URL:-http://mock-pg:8092}
+  MOCK_SWIFT_BASE_URL: ${MOCK_SWIFT_BASE_URL:-http://mock-swift:8093}
+  MOCK_KOFIU_BASE_URL: ${MOCK_KOFIU_BASE_URL:-http://mock-kofiu:8094}
+  MOCK_CLEARING_BASE_URL: ${MOCK_CLEARING_BASE_URL:-http://mock-clearing:8095}
+  JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=20
+
+x-app: &app
+  profiles: [apps]
+  depends_on: &app-dependencies
+    dev-access: {condition: service_started}
+  init: true
+  read_only: true
+  tmpfs: ["/tmp:size=128m,mode=1777"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: ${APP_MEMORY_LIMIT:-384m}
+  volumes: ["./config:/config:ro"]
+
+services:
+  # Local TCP access only: app/data networks remain internal. Do not deploy this in AWS.
+  dev-access:
+    image: haproxy:3.0-alpine
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes: ["./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro"]
+    networks: [main, data, mock, dev-ingress]
+    mem_limit: 64m
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-35432}:5432"
+      - "127.0.0.1:${MARIADB_PORT:-33306}:3306"
+      - "127.0.0.1:${REDIS_HOST_PORT:-36379}:6379"
+      - "127.0.0.1:${KAFKA_HOST_PORT:-39092}:9092"
+      - "127.0.0.1:39090:9090"
+      - "127.0.0.1:33000:3000"
+      - "127.0.0.1:38080:8080"
+      - "127.0.0.1:38081:8081"
+      - "127.0.0.1:38082:8082"
+      - "127.0.0.1:38083:8083"
+      - "127.0.0.1:38084:8084"
+      - "127.0.0.1:38085:8085"
+      - "127.0.0.1:38086:8086"
+      - "127.0.0.1:38087:8087"
+      - "127.0.0.1:38088:8088"
+      - "127.0.0.1:38089:8089"
+      - "127.0.0.1:38090:8090"
+      - "127.0.0.1:38091:8091"
+      - "127.0.0.1:38092:8092"
+      - "127.0.0.1:38093:8093"
+      - "127.0.0.1:38094:8094"
+      - "127.0.0.1:38095:8095"
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: platform_admin
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate an external env file with init-env.py}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Generate an external env file with init-env.py}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init/postgres.sh:/docker-entrypoint-initdb.d/10-services.sh:ro
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U platform_admin -d postgres"]
+      interval: 3s
+      retries: 40
+    mem_limit: 384m
+
+  mariadb:
+    image: mariadb:11.8
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Generate an external env file with init-env.py}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Generate an external env file with init-env.py}
+    command: ["--default-time-zone=+00:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_nopad_bin"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./init/mariadb.sh:/docker-entrypoint-initdb.d/10-services.sh:ro
+    networks: [data]
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 3s
+      retries: 40
+    mem_limit: 384m
+
+  redis:
+    # Upstream 7.2 is a local compatibility target; ElastiCache's 7.1 is not a Docker tag.
+    image: redis:7.2-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: ["redis-data:/data"]
+    networks: [data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      retries: 40
+    mem_limit: 96m
+
+  kafka-volume-init:
+    image: apache/kafka:3.9.1
+    user: "0:0"
+    network_mode: none
+    entrypoint: [/bin/sh, -c]
+    command: ["chown 1000:1000 /var/lib/kafka/data"]
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    mem_limit: 32m
+
+  kafka:
+    image: apache/kafka:3.9.1
+    depends_on:
+      kafka-volume-init: {condition: service_completed_successfully}
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: HOST://:9092,INTERNAL://:19092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:${KAFKA_HOST_PORT:-39092},INTERNAL://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms128m -Xmx256m
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, "bash -c '</dev/tcp/localhost/19092'"]
+      start_period: 20s
+      interval: 5s
+      retries: 40
+    mem_limit: 768m
+
+  kafka-init:
+    image: apache/kafka:3.9.1
+    entrypoint: [/bin/sh, /init/kafka-topics.sh]
+    environment:
+      KAFKA_HEAP_OPTS: -Xms32m -Xmx96m
+    volumes: ["./init/kafka-topics.sh:/init/kafka-topics.sh:ro"]
+    networks: [data]
+    depends_on:
+      kafka: {condition: service_healthy}
+    mem_limit: 192m
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.133.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes: ["../observability/otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro"]
+    networks: [data, mock]
+    mem_limit: 192m
+
+  prometheus:
+    depends_on:
+      dev-access: {condition: service_started}
+    profiles: [observability]
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [data, mock]
+    mem_limit: 192m
+
+  grafana:
+    depends_on:
+      dev-access: {condition: service_started}
+    profiles: [observability]
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Generate an external env file with init-env.py}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/sources.yml:ro
+    networks: [data]
+    mem_limit: 256m
+
+  api-gateway:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/api-gateway:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: api-gateway
+        SERVICE_PORT: '8080'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8080'
+    networks: [main, data]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+
+  auth:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/auth:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: auth
+        SERVICE_PORT: '8081'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8081'
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PG_AUTH_OTP_SERVER_SECRET_HEX: ${AUTH_OTP_SECRET_HEX:-}
+      DB_URL: jdbc:postgresql://postgres:5432/auth_db
+      DB_USERNAME: auth_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  account:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/account:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: account
+        SERVICE_PORT: '8082'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8082'
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      DB_URL: jdbc:mariadb://mariadb:3306/account_db
+      DB_USERNAME: account_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      mariadb: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  ledger:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/ledger:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: ledger
+        SERVICE_PORT: '8083'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8083'
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      DB_URL: jdbc:mariadb://mariadb:3306/ledger_db
+      DB_USERNAME: ledger_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      mariadb: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  transfer:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/transfer:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: transfer
+        SERVICE_PORT: '8084'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8084'
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      DB_URL: jdbc:postgresql://postgres:5432/transfer_db
+      DB_USERNAME: transfer_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  payment:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/payment:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: payment
+        SERVICE_PORT: '8085'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8085'
+      DB_URL: jdbc:postgresql://postgres:5432/payment_db
+      DB_USERNAME: payment_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data, fep]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  settlement:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/settlement:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: settlement
+        SERVICE_PORT: '8086'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8086'
+      DB_URL: jdbc:postgresql://postgres:5432/settlement_db
+      DB_USERNAME: settlement_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data, fep]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  swift:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/swift:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: swift
+        SERVICE_PORT: '8087'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8087'
+      DB_URL: jdbc:postgresql://postgres:5432/swift_db
+      DB_USERNAME: swift_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data, fep]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  wealth-report:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/wealth-report:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: wealth-report
+        SERVICE_PORT: '8088'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8088'
+      DB_URL: jdbc:postgresql://postgres:5432/wealth_report_db
+      DB_USERNAME: wealth_report_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data, ai]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  aml:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/aml:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: aml
+        SERVICE_PORT: '8089'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8089'
+      DB_URL: jdbc:postgresql://postgres:5432/aml_db
+      DB_USERNAME: aml_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [main, data, fep]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  ai-gateway:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/ai-gateway:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: ai-gateway
+        SERVICE_PORT: '8090'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8090'
+      DB_URL: jdbc:postgresql://postgres:5432/ai_gateway_db
+      DB_USERNAME: ai_gateway_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [ai, data, ai-egress]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  fep-adapter:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/fep-adapter:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: fep-adapter
+        SERVICE_PORT: '8091'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8091'
+      DB_URL: jdbc:postgresql://postgres:5432/fep_adapter_db
+      DB_USERNAME: fep_adapter_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [fep, data, mock, fep-egress]
+    depends_on:
+      <<: *app-dependencies
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      kafka-init: {condition: service_completed_successfully}
+
+  mock-pg:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/mock-pg:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: mock-pg
+        SERVICE_PORT: '8092'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8092'
+    networks: [mock]
+
+  mock-swift:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/mock-swift:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: mock-swift
+        SERVICE_PORT: '8093'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8093'
+    networks: [mock]
+
+  mock-kofiu:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/mock-kofiu:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: mock-kofiu
+        SERVICE_PORT: '8094'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8094'
+    networks: [mock]
+
+  mock-clearing:
+    <<: *app
+    image: ${IMAGE_REGISTRY:-sinhan_project}/mock-clearing:${IMAGE_TAG:-local}
+    build:
+      <<: *image-build
+      args:
+        SERVICE_NAME: mock-clearing
+        SERVICE_PORT: '8095'
+    environment:
+      <<: *app-environment
+      SERVER_PORT: '8095'
+    networks: [mock]
+
+# Logical development boundaries only. These bridges do not implement AWS SG rules,
+# VPC peering, IAM, DNS policy or destination allow-lists.
+networks:
+  dev-ingress: {}
+  main: {internal: true}
+  data: {internal: true}
+  ai: {internal: true}
+  fep: {internal: true}
+  mock: {internal: true}
+  ai-egress: {}
+  fep-egress: {}
+
+volumes:
+  postgres-data:
+  mariadb-data:
+  redis-data:
+  kafka-data:
+  prometheus-data:
+  grafana-data:

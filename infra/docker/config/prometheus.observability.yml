@@ -1,0 +1,81 @@
+# Observability override Prometheus configuration.
+# Copy of config/prometheus.yml plus rule_files, alerting and infrastructure scrape jobs.
+# Mounted over /etc/prometheus/prometheus.yml only when compose.observability.yaml is combined;
+# the base stack keeps using config/prometheus.yml unchanged.
+global:
+  scrape_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["api-gateway:8080"]
+        labels: {service: "api-gateway"}
+      - targets: ["auth:8081"]
+        labels: {service: "auth"}
+      - targets: ["account:8082"]
+        labels: {service: "account"}
+      - targets: ["ledger:8083"]
+        labels: {service: "ledger"}
+      - targets: ["transfer:8084"]
+        labels: {service: "transfer"}
+      - targets: ["payment:8085"]
+        labels: {service: "payment"}
+      - targets: ["settlement:8086"]
+        labels: {service: "settlement"}
+      - targets: ["swift:8087"]
+        labels: {service: "swift"}
+      - targets: ["wealth-report:8088"]
+        labels: {service: "wealth-report"}
+      - targets: ["aml:8089"]
+        labels: {service: "aml"}
+      - targets: ["ai-gateway:8090"]
+        labels: {service: "ai-gateway"}
+      - targets: ["fep-adapter:8091"]
+        labels: {service: "fep-adapter"}
+      - targets: ["mock-pg:8092"]
+        labels: {service: "mock-pg"}
+      - targets: ["mock-swift:8093"]
+        labels: {service: "mock-swift"}
+      - targets: ["mock-kofiu:8094"]
+        labels: {service: "mock-kofiu"}
+      - targets: ["mock-clearing:8095"]
+        labels: {service: "mock-clearing"}
+
+  # Observability infrastructure self-monitoring (added by the override).
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels: {service: "prometheus"}
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+        labels: {service: "alertmanager"}
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]
+        labels: {service: "tempo"}
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+        labels: {service: "loki"}
+  - job_name: otel-collector
+    # The collector re-exports OTLP metrics on :8889 (see infra/observability/otel-collector.yml).
+    static_configs:
+      - targets: ["otel-collector:8889"]
+        labels: {service: "otel-collector"}
+  - job_name: kafka-exporter
+    # Broker-side consumer-group lag path (kafka_consumergroup_lag et al.).
+    # Series stay empty until a consumer group commits offsets — expected while
+    # consumers are skeletons; the scrape path is what this target guarantees.
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
+        labels: {service: "kafka-exporter"}

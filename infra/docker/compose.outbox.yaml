@@ -1,0 +1,30 @@
+# Standalone OPT-IN override for infra/docker/compose.yaml. Combine, never use alone:
+#   docker compose --env-file <env> -f infra/docker/compose.yaml \
+#     -f infra/docker/compose.outbox.yaml up -d
+# It enables the outbox relay (OUTBOX_ENABLED=true) on the services listed below.
+# It changes nothing in the base files; dropping the -f flag restores base behavior
+# (outbox.enabled stays false — Docker startup must not silently start money flows).
+#
+# Activation mechanics (see infra/docker/config/application-docker.yml, which keeps
+# outbox.enabled: false with the rationale comment): the OS environment variable
+# OUTBOX_ENABLED outranks the config file via Spring relaxed binding, and
+# OutboxAutoConfiguration (libs/outbox) only activates when outbox.enabled=true
+# AND an OutboxStore bean exists (skeleton profile already registers one per
+# service) AND a KafkaTemplate is present (KAFKA_BOOTSTRAP_SERVERS=kafka:19092 is
+# base compose default; topics are created by init/kafka-topics.sh — adding topics
+# goes through the canonical owner, not this file). Relay tuning: OUTBOX_POLL_DELAY_MS
+# (default 1000ms); the lease(2m) > ackTimeout(5s) x batchSize(20) invariant is
+# enforced by the code.
+#
+# Scope rule: add a service here ONLY after that service's atomic write +
+# outbox_events recording implementation has been verified. Before that, the relay
+# stays idle (skeletons never write outbox rows) — safe but pointless.
+name: sinhan_project_docker
+
+services:
+  ledger:
+    environment:
+      OUTBOX_ENABLED: "true"
+  transfer:
+    environment:
+      OUTBOX_ENABLED: "true"

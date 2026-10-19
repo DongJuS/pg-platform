@@ -19,3 +19,7 @@ infra/terraform/modules/*/.terraform.lock.hcl
 docs/adr/
 docs/api/
 docs/prd/
+
+# Python runtime caches are not source files.
+__pycache__/
+*.py[cod]
