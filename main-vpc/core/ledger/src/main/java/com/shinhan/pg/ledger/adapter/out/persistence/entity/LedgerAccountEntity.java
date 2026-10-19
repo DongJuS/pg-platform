@@ -9,16 +9,9 @@ import java.util.UUID;
  * TODO: @Entity/@Table/@Id 또는 SQL row mapping을 선택한다. 현재 ORM annotation·업무 migration 없음.
  * TODO: 금액/통화·시간대·null·unique·관계 저장을 대조하고 원본 Entity를 API로 반환하지 않는다.
  * </pre>
+ *
+ * <p>구현: ORM 없이 SQL row mapping(JdbcTemplate). V3__ledger.sql의 ledger_accounts 행에 대응한다.
+ * id는 원장 내부 식별자, externalAccountId는 account 서비스의 계좌 ID(unique).
  */
-public final class LedgerAccountEntity {
-    // TODO: id의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID id;
-    // TODO: externalAccountId의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID externalAccountId;
-    // TODO: balance의 컬럼명·null·인덱스·보호 정책 대조
-    private BigDecimal balance;
-    // TODO: balanceCurrency의 컬럼명·null·인덱스·보호 정책 대조
-    private String balanceCurrency;
-    // TODO: version의 컬럼명·null·인덱스·보호 정책 대조
-    private Long version;
-}
+public record LedgerAccountEntity(
+        UUID id, UUID externalAccountId, BigDecimal balance, String balanceCurrency, Long version) {}

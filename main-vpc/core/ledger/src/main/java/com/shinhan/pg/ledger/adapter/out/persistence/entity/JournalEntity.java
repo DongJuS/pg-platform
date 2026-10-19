@@ -10,14 +10,9 @@ import java.util.UUID;
  * TODO: @Entity/@Table/@Id 또는 SQL row mapping을 선택한다. 현재 ORM annotation·업무 migration 없음.
  * TODO: 금액/통화·시간대·null·unique·관계 저장을 대조하고 원본 Entity를 API로 반환하지 않는다.
  * </pre>
+ *
+ * <p>구현: ORM 없이 SQL row mapping(JdbcTemplate). V3__ledger.sql의 journals 행에 대응한다.
+ * postings는 1:N 관계를 postings 테이블 조회 결과로 채운 읽기 투영이다(저장 시에는 무시한다).
  */
-public final class JournalEntity {
-    // TODO: id의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID id;
-    // TODO: transactionId의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID transactionId;
-    // TODO: postingsIds의 컬럼명·null·인덱스·보호 정책 대조
-    private List<UUID> postingsIds;
-    // TODO: postedAt의 컬럼명·null·인덱스·보호 정책 대조
-    private Instant postedAt;
-}
+public record JournalEntity(
+        UUID id, UUID transactionId, List<PostingEntity> postings, Instant postedAt) {}

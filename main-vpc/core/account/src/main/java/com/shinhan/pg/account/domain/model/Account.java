@@ -9,4 +9,9 @@ public record Account(
         String accountNumber,
         String currency,
         String alias,
-        String status) {}
+        String status) {
+    /** 허용 상태 값. 전이 규칙은 AccountStatusPolicy가 소유한다. */
+    public static final String STATUS_ACTIVE = "ACTIVE";
+
+    public static final String STATUS_SUSPENDED = "SUSPENDED";
+}

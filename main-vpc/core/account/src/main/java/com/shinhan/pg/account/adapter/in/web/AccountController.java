@@ -14,6 +14,8 @@ import com.shinhan.pg.account.application.port.in.ChangeAccountStatusUseCase;
 import com.shinhan.pg.account.application.port.in.GetAccountUseCase;
 import com.shinhan.pg.account.application.port.in.ListAccountsUseCase;
 import com.shinhan.pg.account.application.port.in.OpenAccountUseCase;
+import com.shinhan.pg.account.domain.error.AccountErrorCode;
+import com.shinhan.pg.common.commonerror.ApplicationException;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -21,8 +23,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,11 @@ import java.util.UUID;
 
 /** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다.
  * 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다.
+ *
+ * <p>구현 확정(MVP1-F07~F10): 인증 문맥은 §3 계약대로 연결한다 — gateway가 JWT 검증 후
+ * X-User-Id 헤더로 사용자 UUID를 전달한다(외부에서 들어온 X-User-Id/X-Internal-Caller는 gateway가 제거).
+ * PUBLIC 엔드포인트는 X-User-Id가 없으면 application 계층이 401로 거절한다.
+ * F10(INTERNAL)은 X-Internal-Caller 헤더가 없으면 여기서 403으로 거절한다.
  */
 @RestController
 @Profile("skeleton")
@@ -56,11 +63,11 @@ public final class AccountController {
      * <pre>
      * [MVP1-F07] 가상 계좌 개설
      * API 초안: POST /api/v1/accounts
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: 통화(KRW), 계좌 별칭
      * 출력 근거: accountId, 계좌번호
-     * 정상 응답 후보: 201 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 201
      * 오류 후보: 400
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a49812bb64ff9c7f4ac5c09
@@ -69,9 +76,9 @@ public final class AccountController {
     @PostMapping("/api/v1/accounts")
     @ResponseStatus(HttpStatus.CREATED)
     public OpenAccountResponse openAccount(
-            @RequestAttribute(name = "actorUserId", required = false) UUID actorUserId,
+            // TODO[CONTRACT]: gateway JWT 필터 연결 전까지 X-User-Id 헤더를 신뢰 입력으로 사용한다(§3).
+            @RequestHeader(name = "X-User-Id", required = false) UUID actorUserId,
             @RequestBody OpenAccountRequest request) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
         var result =
                 openAccountUseCase.openAccount(
                         new OpenAccountCommand(
@@ -87,11 +94,11 @@ public final class AccountController {
      * <pre>
      * [MVP1-F08] 내 계좌 목록
      * API 초안: GET /api/v1/accounts
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: page, size
      * 출력 근거: 계좌 목록
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 401
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a4981b59cfff3bb73f5629c
@@ -100,10 +107,9 @@ public final class AccountController {
     @GetMapping("/api/v1/accounts")
     @ResponseStatus(HttpStatus.OK)
     public ListAccountsResponse listAccounts(
-            @RequestAttribute(name = "actorUserId", required = false) UUID actorUserId,
+            @RequestHeader(name = "X-User-Id", required = false) UUID actorUserId,
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "size", required = false) Integer size) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
         var result =
                 listAccountsUseCase.listAccounts(
                         new ListAccountsCommand(UUID.randomUUID(), actorUserId, page, size));
@@ -114,11 +120,11 @@ public final class AccountController {
      * <pre>
      * [MVP1-F09] 계좌 상세
      * API 초안: GET /api/v1/accounts/{accountId}
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: accountId
      * 출력 근거: 계좌 메타데이터
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 403 타인 계좌, 404
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a498153b3bff10d8ad2b396
@@ -127,9 +133,8 @@ public final class AccountController {
     @GetMapping("/api/v1/accounts/{accountId}")
     @ResponseStatus(HttpStatus.OK)
     public GetAccountResponse getAccount(
-            @RequestAttribute(name = "actorUserId", required = false) UUID actorUserId,
+            @RequestHeader(name = "X-User-Id", required = false) UUID actorUserId,
             @PathVariable("accountId") UUID accountId) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
         var result =
                 getAccountUseCase.getAccount(
                         new GetAccountCommand(UUID.randomUUID(), actorUserId, accountId));
@@ -146,11 +151,11 @@ public final class AccountController {
      * <pre>
      * [MVP1-F10] 계좌 상태 변경
      * API 초안: PATCH /api/v1/accounts/{accountId}/status
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 서비스 인증 / INTERNAL
      * 입력 근거: status, 사유
      * 출력 근거: 변경된 상태
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 409 허용되지 않는 전이
      * TODO: 경로에 /api/v1이 있어도 내부 서비스 인증 대상이다. Gateway 외부 라우팅에서 제외할 조건을 적어둔다.
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
@@ -160,15 +165,19 @@ public final class AccountController {
     @PatchMapping("/api/v1/accounts/{accountId}/status")
     @ResponseStatus(HttpStatus.OK)
     public ChangeAccountStatusResponse changeAccountStatus(
-            @RequestAttribute(name = "actorUserId", required = false) UUID actorUserId,
+            // INTERNAL 전용: X-Internal-Caller 헤더가 없으면 403(스푸핑 방지는 gateway가 외부 요청의
+            // 해당 헤더를 제거 — WO-A2). 서비스 인증 토큰은 미정(지시서 §5-③).
+            @RequestHeader(name = "X-Internal-Caller", required = false) String internalCaller,
             @RequestBody ChangeAccountStatusRequest request,
             @PathVariable("accountId") UUID accountId) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
+        if (internalCaller == null || internalCaller.isBlank()) {
+            throw new ApplicationException(AccountErrorCode.INTERNAL_CALLER_REQUIRED);
+        }
         var result =
                 changeAccountStatusUseCase.changeAccountStatus(
                         new ChangeAccountStatusCommand(
                                 UUID.randomUUID(),
-                                actorUserId,
+                                null,
                                 request.status(),
                                 request.reason(),
                                 accountId));

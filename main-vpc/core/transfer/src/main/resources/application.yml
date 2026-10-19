@@ -3,6 +3,10 @@ spring:
     name: transfer
   config:
     import: classpath:platform-defaults.yml,classpath:platform-infra.yml
+  kafka:
+    consumer:
+      # ledger.posted는 Outbox relay가 byte[]로 발행한다(ByteArraySerializer — platform-infra.yml).
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 server:
   port: ${SERVER_PORT:8084}
 ---

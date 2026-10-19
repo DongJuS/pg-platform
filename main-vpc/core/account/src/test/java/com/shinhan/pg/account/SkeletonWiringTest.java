@@ -22,7 +22,7 @@ class SkeletonWiringTest {
 
     @Test
     void explicitProfileAssemblesAllDeclaredFlows() {
-        SkeletonWiringAssertions.assembles(
+        SkeletonWiringAssertions.assemblesWithInfrastructure(
                 AccountSkeletonConfiguration.class,
                 OpenAccountUseCase.class,
                 ListAccountsUseCase.class,

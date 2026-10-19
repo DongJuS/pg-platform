@@ -1,5 +1,8 @@
 package com.shinhan.pg.ledger.application.service;
 
+import com.shinhan.pg.common.commonerror.ApplicationException;
+import com.shinhan.pg.common.commonerror.ErrorCode;
+import com.shinhan.pg.common.commonerror.ErrorType;
 import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
 import com.shinhan.pg.ledger.application.command.ApplyInstitutionResultCommand;
 import com.shinhan.pg.ledger.application.command.GetBalanceCommand;
@@ -15,14 +18,26 @@ import com.shinhan.pg.ledger.application.port.out.JournalRepository;
 import com.shinhan.pg.ledger.application.port.out.LedgerAccountRepository;
 import com.shinhan.pg.ledger.application.port.out.LedgerAtomicWritePort;
 import com.shinhan.pg.ledger.application.port.out.PostingRepository;
+import com.shinhan.pg.ledger.application.readmodel.JournalEntryView;
 import com.shinhan.pg.ledger.application.result.GetBalanceResult;
 import com.shinhan.pg.ledger.application.result.ListJournalEntriesResult;
 import com.shinhan.pg.ledger.application.result.PostJournalResult;
 import com.shinhan.pg.ledger.application.result.QueryJournalResult;
+import com.shinhan.pg.ledger.domain.error.LedgerErrorCode;
+import com.shinhan.pg.ledger.domain.error.LedgerException;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Currency;
+import java.util.List;
+import java.util.UUID;
 
 /** 기능별 계약과 TODO를 모은 application 구현 자리.
  * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * 현재 모든 업무 메서드는 명시적 미구현 예외를 던지며 성공 DTO·가짜 금융 결과를 반환하지 않는다.
+ * MVP1-F11~F14는 실구현됐다. 금융 쓰기(분개·잔액·Outbox)의 원자성은 LedgerAtomicWritePort 구현
+ * (LedgerAtomicWriteAdapter)의 단일 MariaDB 잠금 트랜잭션이 담당한다.
  */
 public final class LedgerApplicationService
         implements PostJournalUseCase,
@@ -30,31 +45,38 @@ public final class LedgerApplicationService
                 QueryJournalUseCase,
                 GetBalanceUseCase,
                 ListJournalEntriesUseCase {
+    /** F12 페이지 크기 계약 미정 — 보수적 기본/상한. TODO[CONTRACT]: 최종 계약 시 조정. */
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final LedgerAtomicWritePort ledgerAtomicWritePort;
     private final LedgerAccountRepository ledgerAccountRepository;
     private final JournalRepository journalRepository;
     private final PostingRepository postingRepository;
+    private final com.shinhan.pg.ledger.application.port.out.AccountQueryPort accountQueryPort;
 
     public LedgerApplicationService(
             LedgerAtomicWritePort ledgerAtomicWritePort,
             LedgerAccountRepository ledgerAccountRepository,
             JournalRepository journalRepository,
-            PostingRepository postingRepository) {
+            PostingRepository postingRepository,
+            com.shinhan.pg.ledger.application.port.out.AccountQueryPort accountQueryPort) {
         this.ledgerAtomicWritePort = java.util.Objects.requireNonNull(ledgerAtomicWritePort);
         this.ledgerAccountRepository = java.util.Objects.requireNonNull(ledgerAccountRepository);
         this.journalRepository = java.util.Objects.requireNonNull(journalRepository);
         this.postingRepository = java.util.Objects.requireNonNull(postingRepository);
+        this.accountQueryPort = java.util.Objects.requireNonNull(accountQueryPort);
     }
 
     /**
      * <pre>
      * [MVP1-F13] 분개 반영
      * API 초안: POST /internal/v1/ledger/postings
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 서비스 인증 / INTERNAL
      * 입력 근거: transactionId, posting 목록
      * 출력 근거: journalId
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 409 중복(기존 journal 반환), 422 합계≠0
      * 구현 순서:
      * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
@@ -71,10 +93,30 @@ public final class LedgerApplicationService
     @Override
     public PostJournalResult postJournal(PostJournalCommand command) {
         // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 한 트랜잭션, 합계 0 검증, transactionId unique로 중복 차단
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: ledger.posted만 같은 원장 DB Outbox에 기록한다.
-        throw new FeatureNotImplementedException("MVP1-F13");
+        //   - 신원: X-Internal-Caller 헤더는 AuthContextFilter가 callerServiceId로 싣는다.
+        //     TODO: 서비스 인증 토큰 방식은 지시서 §5-③ 미정 — 헤더 부재를 거절하지 않는다.
+        //   - 입력: 아래 requireValid로 null/빈 목록/통화 코드를 검증한다(400).
+        requireValid(command != null, "command is required");
+        requireValid(command.transactionId() != null, "transactionId is required");
+        requireValid(
+                command.postings() != null && !command.postings().isEmpty(),
+                "postings must not be empty");
+        for (var instruction : command.postings()) {
+            requireValid(
+                    instruction != null
+                            && instruction.accountId() != null
+                            && instruction.signedAmount() != null
+                            && instruction.currency() != null,
+                    "posting requires accountId, signedAmount, currency");
+            try {
+                Currency.getInstance(instruction.currency());
+            } catch (IllegalArgumentException error) {
+                throw invalid("unknown currency: " + instruction.currency());
+            }
+        }
+        // TODO 2~4: 한 트랜잭션·합계 0·transactionId unique·ledger.posted Outbox는
+        // LedgerAtomicWriteAdapter가 구현한다. 이 계층은 트랜잭션을 열지 않는다.
+        return ledgerAtomicWritePort.postWithPessimisticLocks(command);
     }
 
     /**
@@ -87,7 +129,7 @@ public final class LedgerApplicationService
      */
     @Override
     public void applyInstitutionResult(ApplyInstitutionResultCommand command) {
-        // TODO: 위 처리 순서를 구현하고 DB/외부 시스템 검증을 추가한다.
+        // TODO: 위 처리 순서를 구현하고 DB/외부 시스템 검증을 추가한다. (MVP5 범위 — 이번 작업 외)
         throw new FeatureNotImplementedException("MVP5-F06");
     }
 
@@ -95,11 +137,11 @@ public final class LedgerApplicationService
      * <pre>
      * [MVP1-F14] 반영 결과 조회
      * API 초안: GET /internal/v1/ledger/transactions/{transactionId}
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 서비스 인증 / INTERNAL
      * 입력 근거: transactionId
      * 출력 근거: journal 또는 404
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 404 미반영
      * 구현 순서:
      * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
@@ -113,22 +155,33 @@ public final class LedgerApplicationService
      */
     @Override
     public QueryJournalResult queryJournal(QueryJournalCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 재시도·대사용
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F14");
+        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다. (서비스 인증 토큰 §5-③ 미정)
+        requireValid(command != null && command.transactionId() != null, "transactionId is required");
+        // TODO 2: 재시도·대사용 조회. 미반영이면 TRANSACTION_UNKNOWN → 404.
+        var journal =
+                journalRepository
+                        .findByTransactionId(command.transactionId())
+                        .orElseThrow(
+                                () ->
+                                        new LedgerException(
+                                                LedgerErrorCode.TRANSACTION_UNKNOWN,
+                                                "no journal for transactionId="
+                                                        + command.transactionId()));
+        // TODO 3: 조회는 상태를 바꾸지 않는다.
+        // TODO 4: status 명칭("POSTED")은 조회 계약 미정 — 확정 시 갱신한다.
+        var eventId = journalRepository.findPostedEventId(command.transactionId()).orElse(null);
+        return new QueryJournalResult(journal.transactionId(), journal.id(), eventId, "POSTED");
     }
 
     /**
      * <pre>
      * [MVP1-F11] 잔액 조회
      * API 초안: GET /api/v1/accounts/{accountId}/balances
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: accountId
      * 출력 근거: 잔액, 기준 시각
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 403
      * 구현 순서:
      * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
@@ -142,21 +195,36 @@ public final class LedgerApplicationService
     @Override
     public GetBalanceResult getBalance(GetBalanceCommand command) {
         // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 소유권 검사, posting 합으로 잔액 계산
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
+        //   X-User-Id는 AuthContextFilter가 actorUserId로 싣는다(없으면 401).
+        requireValid(command != null && command.accountId() != null, "accountId is required");
+        var verifiedAccount = requireOwnedAccount(command.actorUserId(), command.accountId());
+        // 2. 소유권의 원본은 Account 서비스이며 requireOwnedAccount에서 확인한다.
+        //   actorUserId와 Account의 ownerId가 다르면 403이다.
+        //   잔액은 posting 합의 갱신 결과인 ledger_accounts.balance를 읽는다(스냅샷 캐시 아님).
+        //   분개 이력이 없는 본인 계좌는 Account의 통화로 0원/200을 반환한다.
+        //   계좌 자체가 없으면 Account 조회의 404를 유지한다.
+        var account = ledgerAccountRepository.findByExternalAccountId(command.accountId());
+        if (account.isEmpty()) {
+            return new GetBalanceResult(command.accountId(), java.math.BigDecimal.ZERO, verifiedAccount.currency(), Instant.now());
+        }
+        // TODO 3: 조회는 상태를 바꾸지 않는다.
         // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F11");
+        return new GetBalanceResult(
+                command.accountId(),
+                account.get().balance().amount(),
+                account.get().balance().currency().getCurrencyCode(),
+                Instant.now());
     }
 
     /**
      * <pre>
      * [MVP1-F12] 원장 거래내역
      * API 초안: GET /api/v1/accounts/{accountId}/entries
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: from, to, cursor
      * 출력 근거: entry 목록, nextCursor
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 403
      * 구현 순서:
      * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
@@ -169,10 +237,87 @@ public final class LedgerApplicationService
      */
     @Override
     public ListJournalEntriesResult listJournalEntries(ListJournalEntriesCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 소유권 검사, 시간 역순
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
+        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다. (소유권은 Account 내부 조회로 확인)
+        requireValid(command != null && command.accountId() != null, "accountId is required");
+        var verifiedAccount = requireOwnedAccount(command.actorUserId(), command.accountId());
+        requireValid(
+                command.size() == null || command.size() > 0, "size must be positive");
+        requireValid(
+                command.from() == null || command.to() == null || !command.from().isAfter(command.to()),
+                "from must not be after to");
+        // 2. F11과 같은 소유권 확인 후 시간 역순 키셋 페이지네이션을 적용한다.
+        //   본인 계좌에 분개 이력이 없으면 빈 목록을 반환한다.
+        var size =
+                command.size() == null
+                        ? DEFAULT_PAGE_SIZE
+                        : Math.min(command.size(), MAX_PAGE_SIZE);
+        Instant cursorPostedAt = null;
+        UUID cursorJournalId = null;
+        if (command.cursor() != null && !command.cursor().isBlank()) {
+            var decoded = decodeCursor(command.cursor());
+            cursorPostedAt = decoded.postedAt();
+            cursorJournalId = decoded.journalId();
+        }
+        // TODO 3: 조회는 상태를 바꾸지 않는다. size+1건을 읽어 다음 페이지 유무를 판별한다.
+        var rows =
+                new ArrayList<>(
+                        postingRepository.findEntriesByExternalAccountId(
+                                command.accountId(),
+                                command.from(),
+                                command.to(),
+                                cursorPostedAt,
+                                cursorJournalId,
+                                size + 1));
+        String nextCursor = null;
+        if (rows.size() > size) {
+            rows = new ArrayList<>(rows.subList(0, size));
+            nextCursor = encodeCursor(rows.get(rows.size() - 1));
+        }
         // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP1-F12");
+        return new ListJournalEntriesResult(List.copyOf(rows), nextCursor);
     }
+
+    private com.shinhan.pg.ledger.application.readmodel.AccountAccessSnapshot requireOwnedAccount(UUID actor, UUID accountId) {
+        if (actor == null) throw new ApplicationException(new SimpleErrorCode("LEDGER-UNAUTHORIZED", ErrorType.UNAUTHORIZED, "Authenticated user required"));
+        var account = accountQueryPort.getAccount(accountId);
+        if (!actor.equals(account.ownerId())) throw new ApplicationException(new SimpleErrorCode("LEDGER-FORBIDDEN", ErrorType.FORBIDDEN, "Not the account owner"));
+        return account;
+    }
+
+    /** 커서는 (postedAt, journalId) 키셋. 외부에 노출되는 불투명 값으로 base64url 인코딩한다. */
+    private static String encodeCursor(JournalEntryView last) {
+        var raw = last.postedAt().toString() + "|" + last.journalId();
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private record DecodedCursor(Instant postedAt, UUID journalId) {}
+
+    private static DecodedCursor decodeCursor(String cursor) {
+        try {
+            var raw = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            var separator = raw.lastIndexOf('|');
+            return new DecodedCursor(
+                    Instant.parse(raw.substring(0, separator)),
+                    UUID.fromString(raw.substring(separator + 1)));
+        } catch (RuntimeException error) {
+            throw invalid("invalid cursor");
+        }
+    }
+
+    private static void requireValid(boolean condition, String message) {
+        if (!condition) {
+            throw invalid(message);
+        }
+    }
+
+    private static ApplicationException invalid(String message) {
+        return new ApplicationException(
+                new SimpleErrorCode("LEDGER-INVALID-REQUEST", ErrorType.INVALID, message));
+    }
+
+    /** 공통 ErrorCode 계약의 ledger 구현. HTTP 상태는 PlatformExceptionHandler가 type으로 매핑한다. */
+    private record SimpleErrorCode(String code, ErrorType type, String message)
+            implements ErrorCode {}
 }

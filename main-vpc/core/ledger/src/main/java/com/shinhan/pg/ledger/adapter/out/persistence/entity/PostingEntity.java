@@ -9,16 +9,13 @@ import java.util.UUID;
  * TODO: @Entity/@Table/@Id 또는 SQL row mapping을 선택한다. 현재 ORM annotation·업무 migration 없음.
  * TODO: 금액/통화·시간대·null·unique·관계 저장을 대조하고 원본 Entity를 API로 반환하지 않는다.
  * </pre>
+ *
+ * <p>구현: ORM 없이 SQL row mapping(JdbcTemplate). V3__ledger.sql의 postings 행에 대응한다.
+ * ledgerAccountId는 원장 내부 식별자(FK)이며 외부 계좌 ID가 아니다.
  */
-public final class PostingEntity {
-    // TODO: id의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID id;
-    // TODO: journalId의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID journalId;
-    // TODO: ledgerAccountId의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID ledgerAccountId;
-    // TODO: signedAmount의 컬럼명·null·인덱스·보호 정책 대조
-    private BigDecimal signedAmount;
-    // TODO: signedAmountCurrency의 컬럼명·null·인덱스·보호 정책 대조
-    private String signedAmountCurrency;
-}
+public record PostingEntity(
+        UUID id,
+        UUID journalId,
+        UUID ledgerAccountId,
+        BigDecimal signedAmount,
+        String signedAmountCurrency) {}

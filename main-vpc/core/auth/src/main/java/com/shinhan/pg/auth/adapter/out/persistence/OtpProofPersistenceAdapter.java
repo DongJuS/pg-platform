@@ -69,6 +69,20 @@ public class OtpProofPersistenceAdapter implements OtpProofRepository {
                 .map(mapper::toDomain);
     }
 
+    @Override
+    public boolean useForTransfer(UUID proofId, UUID userId, String idempotencyKey, String requestHash, java.time.Instant now) {
+        int created = jdbc.update(
+            "insert into otp_transfer_uses(proof_id,idempotency_key,request_hash,consumed_at)"
+            + " select id,?,?,? from otp_proofs where id=? and user_id=?"
+            + " and consumed_at is not null and failure_count=0 and expires_at>?"
+            + " on conflict (proof_id) do nothing",
+            idempotencyKey, requestHash, Timestamp.from(now), proofId.toString(), userId.toString(), Timestamp.from(now));
+        if (created == 1) return true;
+        return !jdbc.query("select u.proof_id from otp_transfer_uses u join otp_proofs p on p.id=u.proof_id"
+            + " where u.proof_id=? and p.user_id=? and p.expires_at>? and u.idempotency_key=? and u.request_hash=?",
+            (row,index) -> row.getString(1), proofId.toString(), userId.toString(), Timestamp.from(now), idempotencyKey, requestHash).isEmpty();
+    }
+
     private org.springframework.jdbc.core.RowMapper<OtpProofEntity> rowMapper() {
         return (row, index) -> {
             var consumed = row.getTimestamp("consumed_at");

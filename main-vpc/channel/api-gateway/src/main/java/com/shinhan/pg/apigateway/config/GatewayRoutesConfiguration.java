@@ -1,5 +1,11 @@
 package com.shinhan.pg.apigateway.config;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
 /**
  * <pre>
  * [MVP2-F10] 헬스 체크, [MVP2-F11] 메트릭 수집, [CMN-F02] 망분리·접근 통제 — 라우팅 조립 구현 자리.
@@ -17,7 +23,37 @@ package com.shinhan.pg.apigateway.config;
  * TODO: 서비스 이름/주소·JWT 검증·rate limit·trace 전파를 조립하고 health 외 기본 차단을 유지
  * 보류 운영 API를 라우팅 확정으로 바꾸지 않는다.
  * </pre>
+ *
+ * 구현 상태(WO-A2): 위 TODO 중 MVP1 범위(auth/ledger 조회/account/transfer)는 아래
+ * {@link #gatewayBusinessRoutes}에 실구현됐다. 대상 URI는 기존 `pg.clients.<service>.base-url`
+ * 계약({@link GatewayClientProperties})에서 해소한다. payment/wealth 등 나머지 TODO는 보류 유지.
+ * `/internal/**`·`/ops/**`·`/actuator/**`(health 제외)는 여기에 route를 등록하지 않고
+ * {@link GatewaySecurityConfiguration}의 denyAll로 외부 차단을 유지한다.
  */
-public final class GatewayRoutesConfiguration {
-    private GatewayRoutesConfiguration() {}
+@Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(GatewayClientProperties.class)
+public class GatewayRoutesConfiguration {
+
+    /**
+     * CMN-F02 업무 라우트. order가 매칭 우선순위다(낮을수록 먼저 매칭):
+     * ledger의 balances/entries 조회는 account 광범위 라우트보다 반드시 먼저 선언한다.
+     * 인증 정책(permitAll/authenticated)은 {@link GatewaySecurityConfiguration}의 책임이다.
+     */
+    @Bean
+    RouteLocator gatewayBusinessRoutes(RouteLocatorBuilder builder, GatewayClientProperties clients) {
+        return builder.routes()
+                .route("auth", r -> r.order(1)
+                        .path("/api/v1/auth/**", "/api/v1/users/me")
+                        .uri(clients.auth().baseUrl()))
+                .route("ledger-account-views", r -> r.order(2)
+                        .path("/api/v1/accounts/{id}/balances", "/api/v1/accounts/{id}/entries")
+                        .uri(clients.ledger().baseUrl()))
+                .route("account", r -> r.order(3)
+                        .path("/api/v1/accounts/**")
+                        .uri(clients.account().baseUrl()))
+                .route("transfer", r -> r.order(4)
+                        .path("/api/v1/transfers/**")
+                        .uri(clients.transfer().baseUrl()))
+                .build();
+    }
 }

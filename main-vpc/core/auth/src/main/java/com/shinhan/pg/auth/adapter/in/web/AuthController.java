@@ -59,11 +59,11 @@ public final class AuthController {
      * <pre>
      * [MVP1-F01] 회원가입
      * API 초안: POST /api/v1/auth/register
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 없음 / PUBLIC
      * 입력 근거: 이메일, 비밀번호, 이름, 전화번호
      * 출력 근거: userId
-     * 정상 응답 후보: 201 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 201
      * 오류 후보: 409 이메일 중복, 400 비밀번호 규칙 위반
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a4981ee85fdfeca462ac388
@@ -88,11 +88,11 @@ public final class AuthController {
      * <pre>
      * [MVP1-F02] 로그인
      * API 초안: POST /api/v1/auth/login
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 없음 / PUBLIC
      * 입력 근거: 이메일, 비밀번호
      * 출력 근거: accessToken, refreshToken, 만료 시각
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 401 자격증명 오류, 429 요청 과다
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a4981c69805e570fa72cf1b
@@ -117,11 +117,11 @@ public final class AuthController {
      * <pre>
      * [MVP1-F03] 토큰 재발급
      * API 초안: POST /api/v1/auth/refresh
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 없음 / PUBLIC
      * 입력 근거: refreshToken
      * 출력 근거: 새 accessToken, refreshToken
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 401 만료·철회 토큰
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
      * 출처: https://app.notion.com/p/3faad9292a498100bb77d2811deb087f
@@ -145,11 +145,11 @@ public final class AuthController {
      * <pre>
      * [MVP1-F04] 로그아웃
      * API 초안: POST /api/v1/auth/logout
-     * 상태: 초안 — skeleton profile의 유효 요청은 업무 미구현 501
+     * 상태: 구현 — 인증·권한·업무 검증 후 처리한다
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: accessToken
      * 출력 근거: 204
-     * 정상 응답 후보: 204 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 204
      * 오류 후보: —
      * TODO: 기본 로그아웃은 access jti 철회다. refresh 세션 전체 철회·전체 기기 로그아웃(MVP1-F18)은 보류하며 이 메서드에 자동 추가하지 않는다.
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
@@ -173,7 +173,7 @@ public final class AuthController {
      * 인증/접근: 사용자 JWT / PUBLIC
      * 입력 근거: transferDraftId, otpCode
      * 출력 근거: otpToken(1회용)
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
+     * 정상 응답 후보: 200
      * 오류 후보: 401 불일치, 423 잠금
      * TODO: 실제 OTP 제공사 연동이 아니라 Mock OTP다. proof의 유효시간·소모 조건은 후속 계약이다.
      * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.

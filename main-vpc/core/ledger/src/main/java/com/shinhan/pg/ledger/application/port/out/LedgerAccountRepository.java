@@ -15,5 +15,8 @@ import java.util.UUID;
 public interface LedgerAccountRepository {
     Optional<LedgerAccount> findById(UUID id);
 
+    /** API 경로의 accountId는 account 서비스의 계좌 ID = ledger_accounts.external_account_id다. */
+    Optional<LedgerAccount> findByExternalAccountId(UUID externalAccountId);
+
     void save(LedgerAccount value);
 }

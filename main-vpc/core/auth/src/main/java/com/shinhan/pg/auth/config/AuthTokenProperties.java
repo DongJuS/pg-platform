@@ -43,7 +43,7 @@ public record AuthTokenProperties(
                 Duration.parse(environment.getProperty("pg.auth.otp.token-ttl", "PT5M")),
                 environment.getProperty("pg.auth.jwt.private-key-pem"),
                 environment.getProperty("pg.auth.jwt.public-key-pem"),
-                secretHex != null ? hexDecode(secretHex) : defaults.otpServerSecret());
+                secretHex != null && !secretHex.isBlank() ? hexDecode(secretHex) : defaults.otpServerSecret());
     }
 
     private static byte[] randomOtpSecret() {
@@ -53,6 +53,7 @@ public record AuthTokenProperties(
     }
 
     private static byte[] hexDecode(String hex) {
+        if (!hex.matches("(?:[0-9a-fA-F]{2}){16,}")) throw new IllegalArgumentException("OTP secret must contain at least 16 bytes of hexadecimal data");
         var out = new byte[hex.length() / 2];
         for (int i = 0; i < out.length; i++) {
             out[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);

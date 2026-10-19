@@ -9,12 +9,18 @@ import java.time.Instant;
 
 /** [MVP1-F04] access 토큰 jti를 남은 만료 시간만큼 Redis에 철회한다. Redis 장애 시 로그아웃은 실패로 둔다. */
 public final class RevokedTokenRedisAdapter implements RevokedTokenStorePort {
-    private static final String KEY_PREFIX = "auth:revoked:jti:";
+    private final String keyPrefix;
 
     private final StringRedisTemplate redis;
 
     public RevokedTokenRedisAdapter(StringRedisTemplate redis) {
+        this(redis, "auth:revoked:jti:");
+    }
+
+    public RevokedTokenRedisAdapter(StringRedisTemplate redis, String keyPrefix) {
         this.redis = java.util.Objects.requireNonNull(redis);
+        if (keyPrefix == null || keyPrefix.isBlank()) throw new IllegalArgumentException("Revocation prefix is required");
+        this.keyPrefix = keyPrefix;
     }
 
     @Override
@@ -23,6 +29,6 @@ public final class RevokedTokenRedisAdapter implements RevokedTokenStorePort {
         if (ttl.isNegative() || ttl.isZero()) {
             return;
         }
-        redis.opsForValue().set(KEY_PREFIX + jti, "1", ttl);
+        redis.opsForValue().set(keyPrefix + jti, "1", ttl);
     }
 }
