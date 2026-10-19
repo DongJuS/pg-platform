@@ -1,0 +1,401 @@
+{
+  "started_at_kst": "2026-10-19T10:21:30.471986+09:00",
+  "context": {
+    "directory": "/private/tmp/pg-transfer-e2e-b7nb9h4r",
+    "project": "pg_transfer_e2e_1a0faba2",
+    "image_registry": "sinhan_project_e2e",
+    "image_tag": "20261019-437aed46",
+    "git_head": "4dee7de1e2eaab630e8c61c240d9322460578d2c",
+    "source_working_tree_has_changes": true,
+    "services": [
+      "api-gateway",
+      "auth",
+      "account",
+      "ledger",
+      "transfer"
+    ],
+    "account_proxy_workaround": true,
+    "otp_verified": false
+  },
+  "preconditions": {
+    "account_proxy_workaround": true,
+    "opening_balance_fixture_only": true,
+    "otp_verified": false,
+    "existing_stack_isolated": true
+  },
+  "amount": "10000",
+  "currency": "KRW",
+  "financial_post_requests": 1,
+  "checks": [
+    {
+      "name": "Gateway health",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "User 1 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 1 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 1 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 2 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "Initial balance fixture visible through Gateway -> Ledger",
+      "passed": true,
+      "actual": {
+        "source": "100000",
+        "destination": "0"
+      }
+    },
+    {
+      "name": "Single transfer request returns HTTP 200 COMPLETED",
+      "passed": true,
+      "actual": {
+        "status": 200,
+        "response": {
+          "transferId": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+          "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+          "status": "COMPLETED"
+        },
+        "response_trace_id": "d65a18216329de0e6d3271f0d65335b2"
+      }
+    },
+    {
+      "name": "Exactly one durable completed transfer",
+      "passed": true,
+      "actual": {
+        "id": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+        "transaction_id": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+        "status": "COMPLETED",
+        "amount": "10000.0000",
+        "currency": "KRW",
+        "from_account_id": "15d224d7-d385-4953-a1e6-edf3f0a9c89b",
+        "to_account_id": "26e8a490-30a8-49f3-ba79-3f3e40b4e1c1"
+      }
+    },
+    {
+      "name": "Source debited once and destination credited once",
+      "passed": true,
+      "actual": {
+        "source": "90000",
+        "destination": "10000"
+      }
+    },
+    {
+      "name": "Total money conserved",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "One journal for the same transactionId",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+          "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b"
+        }
+      ]
+    },
+    {
+      "name": "Two balanced postings, -10000 and +10000 KRW",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+          "ledgerAccountId": "55d6fd31-2834-4628-9215-0261b4af565f",
+          "amount": "-10000.0000",
+          "currency": "KRW"
+        },
+        {
+          "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+          "ledgerAccountId": "c4da40d6-8915-4400-b5e9-5a3cb3f497c2",
+          "amount": "10000.0000",
+          "currency": "KRW"
+        }
+      ]
+    },
+    {
+      "name": "Transfer status API returns the committed result",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 1 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 2 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Both local Outbox rows were ACKed by Kafka",
+      "passed": true,
+      "actual": {
+        "ledger": [
+          {
+            "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+            "destination": "ledger.posted",
+            "routingKey": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+            "payload": "{\"eventId\":\"7b231866-87ce-4d58-9078-d19c0456ec82\",\"transactionId\":\"ff8c93e3-958a-4f0f-9bc3-1e6d9186574b\",\"journalId\":\"6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4\",\"occurredAt\":\"2026-10-19T01:21:31.543794545Z\"}",
+            "publishedAt": "2026-10-19 01:21:31.000000",
+            "attempts": 0
+          }
+        ],
+        "transfer": [
+          {
+            "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+            "destination": "transfer.completed",
+            "routingKey": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+            "payload": "{\"eventId\":\"7b231866-87ce-4d58-9078-d19c0456ec82\",\"transferId\":\"750fc15c-1ff7-4173-8d96-96ee664420d2\",\"transactionId\":\"ff8c93e3-958a-4f0f-9bc3-1e6d9186574b\",\"journalId\":\"6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4\",\"occurredAt\":\"2026-10-19T01:21:31.553897587Z\"}",
+            "publishedAt": "2026-10-19T01:21:32.220743+00:00",
+            "attempts": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "ledger.posted is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "ledger.posted contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "transfer.completed is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "transfer.completed contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "Transfer consumer committed ledger.posted with zero lag",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "REST and event completion leave one completion transition",
+      "passed": true,
+      "actual": [
+        {
+          "previous_status": null,
+          "next_status": "RECEIVED",
+          "reason_code": "REQUEST_RECEIVED"
+        },
+        {
+          "previous_status": "RECEIVED",
+          "next_status": "PROCESSING",
+          "reason_code": "LEDGER_POST_REQUESTED"
+        },
+        {
+          "previous_status": "PROCESSING",
+          "next_status": "COMPLETED",
+          "reason_code": "LEDGER_POSTED"
+        }
+      ]
+    },
+    {
+      "name": "Exactly one financial POST was issued",
+      "passed": true,
+      "actual": 1
+    }
+  ],
+  "gateway_address": "http://127.0.0.1:55001",
+  "accounts": {
+    "source": "15d224d7-d385-4953-a1e6-edf3f0a9c89b",
+    "destination": "26e8a490-30a8-49f3-ba79-3f3e40b4e1c1"
+  },
+  "balances_before": {
+    "source": "100000",
+    "destination": "0"
+  },
+  "idempotency_key": "e2e-acf70a20d5da429d863522bd80465a01",
+  "transfer_api": {
+    "status": 200,
+    "response": {
+      "transferId": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+      "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+      "status": "COMPLETED"
+    },
+    "response_trace_id": "d65a18216329de0e6d3271f0d65335b2"
+  },
+  "transfer_database": {
+    "id": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+    "transaction_id": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+    "status": "COMPLETED",
+    "amount": "10000.0000",
+    "currency": "KRW",
+    "from_account_id": "15d224d7-d385-4953-a1e6-edf3f0a9c89b",
+    "to_account_id": "26e8a490-30a8-49f3-ba79-3f3e40b4e1c1"
+  },
+  "balances_after": {
+    "source": "90000",
+    "destination": "10000"
+  },
+  "journals": [
+    {
+      "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+      "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b"
+    }
+  ],
+  "postings": [
+    {
+      "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+      "ledgerAccountId": "55d6fd31-2834-4628-9215-0261b4af565f",
+      "amount": "-10000.0000",
+      "currency": "KRW"
+    },
+    {
+      "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+      "ledgerAccountId": "c4da40d6-8915-4400-b5e9-5a3cb3f497c2",
+      "amount": "10000.0000",
+      "currency": "KRW"
+    }
+  ],
+  "outbox": {
+    "ledger": [
+      {
+        "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+        "destination": "ledger.posted",
+        "routingKey": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+        "payload": "{\"eventId\":\"7b231866-87ce-4d58-9078-d19c0456ec82\",\"transactionId\":\"ff8c93e3-958a-4f0f-9bc3-1e6d9186574b\",\"journalId\":\"6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4\",\"occurredAt\":\"2026-10-19T01:21:31.543794545Z\"}",
+        "publishedAt": "2026-10-19 01:21:31.000000",
+        "attempts": 0
+      }
+    ],
+    "transfer": [
+      {
+        "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+        "destination": "transfer.completed",
+        "routingKey": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+        "payload": "{\"eventId\":\"7b231866-87ce-4d58-9078-d19c0456ec82\",\"transferId\":\"750fc15c-1ff7-4173-8d96-96ee664420d2\",\"transactionId\":\"ff8c93e3-958a-4f0f-9bc3-1e6d9186574b\",\"journalId\":\"6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4\",\"occurredAt\":\"2026-10-19T01:21:31.553897587Z\"}",
+        "publishedAt": "2026-10-19T01:21:32.220743+00:00",
+        "attempts": 0
+      }
+    ]
+  },
+  "kafka": {
+    "ledger.posted": {
+      "messages": [
+        {
+          "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+          "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+          "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+          "occurredAt": "2026-10-19T01:21:31.543794545Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "ledger.posted:0:1",
+        "ledger.posted:1:0",
+        "ledger.posted:2:0"
+      ],
+      "record_count": 1
+    },
+    "transfer.completed": {
+      "messages": [
+        {
+          "eventId": "7b231866-87ce-4d58-9078-d19c0456ec82",
+          "transferId": "750fc15c-1ff7-4173-8d96-96ee664420d2",
+          "transactionId": "ff8c93e3-958a-4f0f-9bc3-1e6d9186574b",
+          "journalId": "6577fa4c-c8d1-4ff6-9d3d-2e54ebd2d8f4",
+          "occurredAt": "2026-10-19T01:21:31.553897587Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "transfer.completed:0:1",
+        "transfer.completed:1:0",
+        "transfer.completed:2:0"
+      ],
+      "record_count": 1
+    }
+  },
+  "transfer_consumer_group": [
+    "",
+    "GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                              HOST            CLIENT-ID",
+    "transfer        ledger.posted   1          0               0               0               consumer-transfer-1-575ad79d-f29e-494c-81e3-0c4de6b6ad67 /172.26.0.10    consumer-transfer-1",
+    "transfer        ledger.posted   0          1               1               0               consumer-transfer-1-575ad79d-f29e-494c-81e3-0c4de6b6ad67 /172.26.0.10    consumer-transfer-1",
+    "transfer        ledger.posted   2          0               0               0               consumer-transfer-1-575ad79d-f29e-494c-81e3-0c4de6b6ad67 /172.26.0.10    consumer-transfer-1"
+  ],
+  "state_history": [
+    {
+      "previous_status": null,
+      "next_status": "RECEIVED",
+      "reason_code": "REQUEST_RECEIVED"
+    },
+    {
+      "previous_status": "RECEIVED",
+      "next_status": "PROCESSING",
+      "reason_code": "LEDGER_POST_REQUESTED"
+    },
+    {
+      "previous_status": "PROCESSING",
+      "next_status": "COMPLETED",
+      "reason_code": "LEDGER_POSTED"
+    }
+  ],
+  "passed": true,
+  "finished_at_kst": "2026-10-19T10:21:44.183913+09:00",
+  "images": {
+    "api-gateway": {
+      "image": "sinhan_project_e2e/api-gateway:20261019-437aed46",
+      "id": "sha256:7ff5241ad50db297a88a1e55e86138bffff9d7a240b81ab619a0b1c60eb57b36",
+      "architecture": "arm64"
+    },
+    "auth": {
+      "image": "sinhan_project_e2e/auth:20261019-437aed46",
+      "id": "sha256:c0bc5206778b21477ed3d9df549a562f8ea22ee3d1d327e14d3555e0562e5d28",
+      "architecture": "arm64"
+    },
+    "account": {
+      "image": "sinhan_project_e2e/account:20261019-437aed46",
+      "id": "sha256:96cc65e0e7af7930bf3e986f3caab94613960b5f47b020e8c28936b8c179970e",
+      "architecture": "arm64"
+    },
+    "ledger": {
+      "image": "sinhan_project_e2e/ledger:20261019-437aed46",
+      "id": "sha256:e95935713e41c3dcb745bcc0c6070074507ed1350ab0101f52ae54b153962705",
+      "architecture": "arm64"
+    },
+    "transfer": {
+      "image": "sinhan_project_e2e/transfer:20261019-437aed46",
+      "id": "sha256:5b6b16e7df2480abcd50cf9907d205081a7a560114787c4109b9fbd06ac0c923",
+      "architecture": "arm64"
+    }
+  },
+  "existing_stack_preserved": true,
+  "cleanup": {
+    "test_containers_removed": true,
+    "test_volumes_removed": true,
+    "existing_stack_preserved": true
+  }
+}
