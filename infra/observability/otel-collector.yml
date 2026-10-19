@@ -1,3 +1,8 @@
+# Shared collector config, mounted by the base stack (infra/docker/compose.yaml).
+# Traces/metrics only — intentionally no logs pipeline: adding otlphttp/loki here
+# would make the base-only collector retry forever against a nonexistent loki.
+# compose.observability.yaml swaps this mount for
+# infra/docker/config/otel-collector.observability.yml, which adds the logs pipeline.
 receivers:
   otlp:
     protocols:
@@ -15,12 +20,17 @@ exporters:
     verbosity: basic
   prometheus:
     endpoint: 0.0.0.0:8889
+  # [MVP2-F12] traces를 Tempo로 전달(OTLP gRPC). tempo.yml 참조.
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [debug, otlp/tempo]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]

@@ -1,0 +1,89 @@
+{
+  "uid": "pg-platform-messaging",
+  "title": "PG Platform — 메시징(Kafka·Outbox)",
+  "description": "[MVP2-F12] Kafka consumer lag과 Outbox 미발행 누적. outbox 메트릭은 미구현이므로 구현 전에는 빈 패널로 보인다.",
+  "tags": ["mvp2-f12", "messaging", "kafka", "outbox"],
+  "timezone": "browser",
+  "editable": true,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "schemaVersion": 41,
+  "version": 1,
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Kafka consumer lag (topic별 최대)",
+      "description": "kafka_consumer_fetch_manager_records_lag_max — spring-kafka Micrometer 바인딩 활성 시에만 존재(확인 필요).",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (topic) (kafka_consumer_fetch_manager_records_lag_max)",
+          "legendFormat": "{{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 10}},
+        "overrides": []
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Outbox 미발행 이벤트 누적 (서비스별)",
+      "description": "pg_outbox_unpublished_events — 업무 메트릭 미구현. libs/outbox relay가 노출하면 표시된다.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pg_outbox_unpublished_events",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 10}},
+        "overrides": []
+      },
+      "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outbox 최장 미발행 이벤트 나이 (초)",
+      "description": "pg_outbox_oldest_unpublished_age_seconds — 업무 메트릭 미구현.",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "max(pg_outbox_oldest_unpublished_age_seconds)", "legendFormat": "oldest"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 60}, {"color": "red", "value": 300}]}},
+        "overrides": []
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "value"}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "대사 불일치 (10m 증가분)",
+      "description": "pg_payment_reconciliation_mismatch_total — 자리 표시. payment에 대사 메트릭이 생기면 연결.",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum(increase(pg_payment_reconciliation_mismatch_total[10m]))", "legendFormat": "mismatch"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}},
+        "overrides": []
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "orientation": "auto", "textMode": "auto", "colorMode": "value"}
+    }
+  ]
+}

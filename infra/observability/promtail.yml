@@ -1,0 +1,34 @@
+# [MVP2-F12] Promtail 참조용 구성 — Linux/AWS 전용. 로컬 Docker Desktop(macOS)에서는 사용하지 않는다.
+#
+# 배경: Docker Desktop은 컨테이너를 Linux VM 안에서 실행하므로 호스트에
+# /var/lib/docker/containers가 없다. 따라서 아래 docker 서비스 디스커버리 구성은
+# macOS 로컬에서는 로그 파일을 읽지 못한다.
+# [WO-3 확정] 로컬 로그 수집 경로는 **OTLP logs**로 채택됐다: Spring Boot 3.5의
+# MANAGEMENT_OTLP_LOGGING_ENDPOINT → otel-collector(logs pipeline) → Loki /otlp/v1/logs
+# (compose.observability.yaml이 16개 앱 서비스에 환경변수를 주입하고,
+# infra/docker/config/otel-collector.observability.yml이 logs pipeline을 제공).
+# 이 파일은 AWS(EC2/EKS) 이전 시 참조용으로만 유지한다.
+# 이미지 태그 계약(AWS 이전 시): grafana/promtail:3.5.5 (promtail은 3.5.x까지만 릴리스됨.
+# 이후 Grafana Alloy로 대체 예정이므로 AWS 이전 시 Alloy 전환도 함께 검토).
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      # 컨테이너 이름에서 compose 프로젝트 접두를 제거해 service 라벨로 사용한다.
+      - source_labels: [__meta_docker_container_name]
+        regex: "/?(?:sinhan_project_docker-)?([a-z0-9-]+?)(?:-[0-9]+)?$"
+        target_label: service
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: stream
