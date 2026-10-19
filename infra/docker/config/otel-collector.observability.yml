@@ -1,0 +1,46 @@
+# Observability-override variant of infra/observability/otel-collector.yml.
+# Mounted over /etc/otelcol-contrib/config.yaml only when compose.observability.yaml
+# is combined; the base stack keeps the shared traces/metrics-only config so the
+# collector never references loki when the observability profile is absent.
+# Differences vs the shared file: the otlphttp/loki exporter and the logs pipeline.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 120
+  batch: {}
+exporters:
+  debug:
+    verbosity: basic
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  # [MVP2-F12] traces를 Tempo로 전달(OTLP gRPC). tempo.yml 참조.
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # [WO-3] 앱 로그를 Loki 3.x 네이티브 OTLP ingest로 전달.
+  # endpoint는 베이스 URL(/otlp)만 지정 — 실제 ingest path /otlp/v1/logs는 exporter가 붙인다.
+  # deprecated `loki` exporter는 사용하지 않는다. loki가 없으면 재시도만 한다(프로세스는 유지).
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug, otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug, otlphttp/loki]

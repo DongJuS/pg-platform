@@ -1,0 +1,299 @@
+{
+  "date": "2026-10-19",
+  "scope": "Local MVP1 operations REST API; functional acceptance, not a load test",
+  "http_contract_tests": {
+    "total": 9,
+    "passed": 9
+  },
+  "live_http_checks": {
+    "new_run": 202,
+    "get_run": 200,
+    "same_idempotency_key": 200,
+    "concurrent_distinct_run": 409,
+    "missing_operator_token": 401
+  },
+  "disposable_resources_removed": true,
+  "result": {
+    "runId": "21a4307d-507d-42e5-857d-6b709f54123b",
+    "suite": "MVP1",
+    "kind": "FUNCTIONAL_ACCEPTANCE",
+    "status": "SUCCEEDED",
+    "phase": "FINISHED",
+    "createdAt": "2026-10-19T03:22:53.861576+00:00",
+    "startedAt": "2026-10-19T03:22:53.861678+00:00",
+    "finishedAt": "2026-10-19T03:23:45.115851+00:00",
+    "links": {
+      "self": "/ops/v1/performance-runs/21a4307d-507d-42e5-857d-6b709f54123b"
+    },
+    "summary": {
+      "total": 65,
+      "passed": 65,
+      "failed": 0
+    },
+    "checks": [
+      {
+        "name": "Gateway health",
+        "passed": true
+      },
+      {
+        "name": "User 1 registered through Gateway",
+        "passed": true
+      },
+      {
+        "name": "User 1 logged in through Gateway",
+        "passed": true
+      },
+      {
+        "name": "Account 1 created with verified JWT",
+        "passed": true
+      },
+      {
+        "name": "User 2 registered through Gateway",
+        "passed": true
+      },
+      {
+        "name": "User 2 logged in through Gateway",
+        "passed": true
+      },
+      {
+        "name": "Account 2 created with verified JWT",
+        "passed": true
+      },
+      {
+        "name": "No account proxy workaround is configured",
+        "passed": true
+      },
+      {
+        "name": "Newly opened accounts have zero balance",
+        "passed": true
+      },
+      {
+        "name": "Auth user profile receives verified Gateway identity",
+        "passed": true
+      },
+      {
+        "name": "Another user's balance is forbidden",
+        "passed": true
+      },
+      {
+        "name": "Another user's entries are forbidden",
+        "passed": true
+      },
+      {
+        "name": "Spoofed user identity is scrubbed",
+        "passed": true
+      },
+      {
+        "name": "Unknown account remains 404",
+        "passed": true
+      },
+      {
+        "name": "Missing OTP is rejected before reservation",
+        "passed": true
+      },
+      {
+        "name": "Forged OTP is rejected",
+        "passed": true
+      },
+      {
+        "name": "Invalid JWT signature is rejected",
+        "passed": true
+      },
+      {
+        "name": "Gateway denies internal endpoints",
+        "passed": true
+      },
+      {
+        "name": "Initial balance fixture visible through Gateway -> Ledger",
+        "passed": true
+      },
+      {
+        "name": "Real Mock-TOTP authorization issued",
+        "passed": true
+      },
+      {
+        "name": "Single transfer request returns HTTP 200 COMPLETED",
+        "passed": true
+      },
+      {
+        "name": "Exactly one durable completed transfer",
+        "passed": true
+      },
+      {
+        "name": "Source debited once and destination credited once",
+        "passed": true
+      },
+      {
+        "name": "Total money conserved",
+        "passed": true
+      },
+      {
+        "name": "One journal for the same transactionId",
+        "passed": true
+      },
+      {
+        "name": "Two balanced postings, -10000 and +10000 KRW",
+        "passed": true
+      },
+      {
+        "name": "Transfer status API returns the committed result",
+        "passed": true
+      },
+      {
+        "name": "Account 1 transaction history routes to Ledger",
+        "passed": true
+      },
+      {
+        "name": "Account 2 transaction history routes to Ledger",
+        "passed": true
+      },
+      {
+        "name": "Same request is 409 without another debit",
+        "passed": true
+      },
+      {
+        "name": "Duplicate response identifies the original transfer",
+        "passed": true
+      },
+      {
+        "name": "Same OTP cannot authorize another transfer",
+        "passed": true
+      },
+      {
+        "name": "Another user cannot use an OTP authorization",
+        "passed": true
+      },
+      {
+        "name": "Real Mock-TOTP authorization issued",
+        "passed": true
+      },
+      {
+        "name": "Another user cannot debit the source account",
+        "passed": true
+      },
+      {
+        "name": "Real Mock-TOTP authorization issued",
+        "passed": true
+      },
+      {
+        "name": "Insufficient funds is 422 rather than 500",
+        "passed": true
+      },
+      {
+        "name": "Internal account lookup requires service authentication",
+        "passed": true
+      },
+      {
+        "name": "Encoded internal path cannot bypass authentication",
+        "passed": true
+      },
+      {
+        "name": "Encoded status PATCH cannot bypass authentication",
+        "passed": true
+      },
+      {
+        "name": "Authenticated internal status change succeeds",
+        "passed": true
+      },
+      {
+        "name": "Real Mock-TOTP authorization issued",
+        "passed": true
+      },
+      {
+        "name": "Suspended account cannot transfer",
+        "passed": true
+      },
+      {
+        "name": "Account status can be restored",
+        "passed": true
+      },
+      {
+        "name": "Real Mock-TOTP authorization issued",
+        "passed": true
+      },
+      {
+        "name": "Expired authorization cannot transfer",
+        "passed": true
+      },
+      {
+        "name": "Wrong OTP code is rejected",
+        "passed": true
+      },
+      {
+        "name": "Wrong OTP code is rejected",
+        "passed": true
+      },
+      {
+        "name": "Wrong OTP code is rejected",
+        "passed": true
+      },
+      {
+        "name": "Wrong OTP code is rejected",
+        "passed": true
+      },
+      {
+        "name": "Wrong OTP code is rejected",
+        "passed": true
+      },
+      {
+        "name": "Repeated OTP failures lock the draft with 423",
+        "passed": true
+      },
+      {
+        "name": "Logout completes",
+        "passed": true
+      },
+      {
+        "name": "Logged-out JWT cannot access protected APIs",
+        "passed": true
+      },
+      {
+        "name": "Fresh login remains possible after logout",
+        "passed": true
+      },
+      {
+        "name": "Rejected requests never changed either balance",
+        "passed": true
+      },
+      {
+        "name": "Only success and insufficient-funds requests were reserved",
+        "passed": true
+      },
+      {
+        "name": "Both local Outbox rows were ACKed by Kafka",
+        "passed": true
+      },
+      {
+        "name": "ledger.posted is readable from the real Kafka broker",
+        "passed": true
+      },
+      {
+        "name": "ledger.posted contains one record in this clean broker",
+        "passed": true
+      },
+      {
+        "name": "transfer.completed is readable from the real Kafka broker",
+        "passed": true
+      },
+      {
+        "name": "transfer.completed contains one record in this clean broker",
+        "passed": true
+      },
+      {
+        "name": "Transfer consumer committed ledger.posted with zero lag",
+        "passed": true
+      },
+      {
+        "name": "REST and event completion leave one completion transition",
+        "passed": true
+      },
+      {
+        "name": "Only one transfer journal exists after all rejection probes",
+        "passed": true
+      }
+    ],
+    "cleanupComplete": true,
+    "existingStackPreserved": true,
+    "sourceSha256": "7ad5aae347107847b8d1309db7b4ad22faae882c3ee0e3996510101cb17183e1"
+  }
+}

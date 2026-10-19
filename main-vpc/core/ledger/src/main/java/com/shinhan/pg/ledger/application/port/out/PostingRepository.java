@@ -1,7 +1,10 @@
 package com.shinhan.pg.ledger.application.port.out;
 
+import com.shinhan.pg.ledger.application.readmodel.JournalEntryView;
 import com.shinhan.pg.ledger.domain.model.Posting;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +17,19 @@ import java.util.UUID;
  */
 public interface PostingRepository {
     Optional<Posting> findById(UUID id);
+
+    /**
+     * [MVP1-F12] 계좌 거래내역 키셋 페이지네이션. (posted_at, journal_id) 역순 정렬이며
+     * cursorPostedAt/cursorJournalId가 있으면 그 지점 바로 다음부터 읽는다.
+     * from/to는 posted_at 포함 범위 필터다.
+     */
+    List<JournalEntryView> findEntriesByExternalAccountId(
+            UUID externalAccountId,
+            Instant from,
+            Instant to,
+            Instant cursorPostedAt,
+            UUID cursorJournalId,
+            int limit);
 
     void save(Posting value);
 }

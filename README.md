@@ -1,12 +1,14 @@
 # pg-platform
 
+Banking MVP1 is implemented and verified locally. See [MVP1 completion and acceptance checks](infra/docker/MVP1_COMPLETION.md) for the current scope and configuration. Other MVPs remain in progress.
+
 <p align="center">
   <img src="docs/readme/system-architecture.png" width="100%" alt="pg-platform system architecture. Users reach a load balancer and the API Gateway in the main VPC. The core layer holds internet banking, payment processing, and clearing and settlement; the information layer holds wealth reporting and anti-money laundering; the external layer holds overseas remittance; and the data subnets hold PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC simulates the external institutions.">
 </p>
 
 pg-platform is a payment and banking platform laid out the way a Korean bank splits its systems. A channel layer faces customers, a core layer owns accounts and the ledger, an external layer handles overseas messages, and an information layer runs reports and anti-money-laundering checks. Every request to an outside institution leaves through one front-end processor (FEP), and every request to an outside AI model leaves through a separate AI gateway.
 
-The repository is a Gradle monorepo of 16 Spring Boot services and 5 shared libraries, plus Terraform for a four-VPC AWS network. Its design goal is that money stays correct when something fails. It is a skeleton today: the structure, wiring, architecture rules and infrastructure code are in place, and the business logic is still TODO.
+The repository is a Gradle monorepo of 16 Spring Boot services and 5 shared libraries, plus Terraform for a four-VPC AWS network. Its design goal is that money stays correct when something fails. Its banking MVP1 has real authentication, account, ledger and transfer implementations; the remaining MVPs retain their explicit implementation TODOs.
 
 ## Works with
 
@@ -29,7 +31,7 @@ The repository is a Gradle monorepo of 16 Spring Boot services and 5 shared libr
 A request moves through the platform in five steps.
 
 1. A client calls `/api/v1/**` over HTTPS. The Application Load Balancer in the main VPC's public subnet terminates TLS with an ACM certificate.
-2. `api-gateway` checks the JWT (RS256, issued by `auth`) and the rate limit (Redis), then routes the call to the core or information layer. Until those checks are implemented, it blocks everything except health checks.
+2. `api-gateway` checks the JWT (RS256, issued by `auth`) and the rate limit (Redis), then routes the call to the core or information layer. MVP1 authentication and banking routes are active; token revocation is checked in Redis. Rate limiting remains a separate MVP2 task.
 3. Each service runs the use case behind an input port. Domain code is plain Java. Adapters talk to the service's own database, to Kafka and to other services.
 4. A service that changes state writes the change and an outbox row in one local transaction. A polling relay publishes outbox rows to Kafka, and consumers drop duplicates by key, because delivery is at-least-once.
 5. Calls to outside institutions go to `fep-adapter` over internal REST, across VPC peering. Only the FEP VPC and the AI VPC have NAT gateways, and the data subnets have no route to the internet.
@@ -47,7 +49,7 @@ A request moves through the platform in five steps.
 
 ---
 
-The scope is split into seven MVPs. Each feature ID maps to an input port, a use case and its files. Of the 41 documented API contracts, 36 are wired as dev-only routes that return 501, and 5 deferred ones stay as comments.
+The scope is split into seven MVPs. Each feature ID maps to an input port, a use case and its files. MVP1 routes now execute real operations in the local Docker profile. Features outside MVP1 remain explicit TODO/501 or deferred contracts.
 
 | MVP | Feature area | Services |
 | --- | --- | --- |
@@ -161,16 +163,26 @@ On macOS with Homebrew, point `JAVA_HOME` at JDK 21 first:
 export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
 ```
 
-Start the local stack and one service. `infra/docker-compose/.env.example` lists the variable names only; keep real values in an env file outside the repository.
+Start the local stack and one service. `infra/docker-compose/.env.example` lists the variable names only; keep real values in an env file outside the repository. Services run as locally built images (`pg-platform/<service>:local`, built from `infra/docker/Dockerfile.service` with the service's `bootJar` output), so build the jar first and let Compose build the image:
 
 ```sh
 docker compose -f infra/docker-compose/compose.yaml --env-file /path/to/local.env up -d --wait
 ./gradlew :transfer:bootJar
-docker compose -f infra/docker-compose/compose.yaml --env-file /path/to/local.env --profile smoke up -d transfer
+docker compose -f infra/docker-compose/compose.yaml --env-file /path/to/local.env --profile smoke up -d --build --wait transfer
 curl http://localhost:18084/actuator/health
 ```
 
-Check MariaDB the same way with `./gradlew :account:bootJar` and `--profile db-smoke up -d account`; its health is at `http://localhost:18082/actuator/health`. The skeleton beans and dev-only routes load only with the `skeleton` Spring profile. The default, `local` and `aws` profiles register none of them.
+Check MariaDB the same way with `./gradlew :account:bootJar` and `--profile db-smoke up -d --build --wait account`; its health is at `http://localhost:18082/actuator/health`. The skeleton beans and dev-only routes load only with the `skeleton` Spring profile. The default, `local` and `aws` profiles register none of them.
+
+Run the whole platform locally as an AWS stand-in. The base `up` starts PostgreSQL, MariaDB, Redis, Kafka, Prometheus, Grafana, the OTel Collector and localstack (S3), plus one-shot jobs that create the Kafka topics (`kafka-init`) and the local report bucket (`localstack-init`):
+
+```sh
+./gradlew bootJar
+docker compose -f infra/docker-compose/compose.yaml --env-file /path/to/local.env --profile platform --profile mocks up -d --build --wait
+curl http://localhost:18080/actuator/health   # api-gateway; other services are listed under Data Storage
+```
+
+The `platform` profile starts the 12 business services, `mocks` starts the four external-institution simulators, and `observability` adds alertmanager, tempo, loki and promtail (their config files under `infra/observability/` are required for that profile).
 
 Prove that the architecture rules catch real violations. The script injects R1 and R5 violations and a `Money` subclass into the sources, expects the build to fail, and removes them in a `finally` block:
 
@@ -205,7 +217,7 @@ A real AWS deployment also needs an existing S3 state bucket, a Secrets Manager 
 
 ---
 
-Each service owns its database, and no service reads another service's tables. Flyway applies an empty baseline for now; business tables are TODO.
+Each service owns its database, and no service reads another service's tables. Flyway owns the implemented MVP1 tables, including OTP transfer consumption. Other business schemas remain implementation TODOs.
 
 | Store | Used by | Holds |
 | --- | --- | --- |
@@ -213,7 +225,7 @@ Each service owns its database, and no service reads another service's tables. F
 | MariaDB 11.8 | account, ledger | `account_db`, `ledger_db` |
 | Redis | api-gateway and the services | Rate limits, token revocation, locks, cache. Never the final idempotency check. |
 | Kafka | Producers through their outbox | Events such as `ledger.posted`, `transfer.completed`, `transfer.outbound` and `fep.ack` |
-| Amazon S3 | wealth-report | Generated report PDFs |
+| Amazon S3 | wealth-report | Generated report PDFs. Locally, localstack stands in for S3 (endpoint `http://localhost:24566`, bucket `pg-platform-local-reports`) |
 
 On AWS, the stores live in the main VPC's data subnets, which have no route to the internet. `ai-gateway` and `fep-adapter` reach them over VPC peering. Every paid resource is a Terraform toggle that is off by default.
 
@@ -223,10 +235,29 @@ On AWS, the stores live in the main VPC's data subnets, which have no route to t
 | MariaDB | `localhost:23306` |
 | Redis | `localhost:26379` |
 | Kafka | `localhost:29092` |
+| localstack (S3) | `http://localhost:24566` |
 | Prometheus | `http://localhost:29090` |
 | Grafana | `http://localhost:23000` |
 | OpenTelemetry Collector | gRPC `localhost:24317`, HTTP `localhost:24318` |
+| alertmanager (profile `observability`) | `http://localhost:29093` |
+| loki (profile `observability`) | `http://localhost:23100` |
+| tempo (profile `observability`) | `http://localhost:23200` |
+| api-gateway | `http://localhost:18080` |
+| auth | `http://localhost:18081` |
+| account | `http://localhost:18082` |
+| ledger | `http://localhost:18083` |
 | transfer | `http://localhost:18084` |
+| payment | `http://localhost:18085` |
+| settlement | `http://localhost:18086` |
+| swift | `http://localhost:18087` |
+| wealth-report | `http://localhost:18088` |
+| aml | `http://localhost:18089` |
+| ai-gateway | `http://localhost:18090` |
+| fep-adapter | `http://localhost:18091` |
+| mock-pg (profile `mocks`) | `http://localhost:18100` |
+| mock-swift (profile `mocks`) | `http://localhost:18101` |
+| mock-kofiu (profile `mocks`) | `http://localhost:18102` |
+| mock-clearing (profile `mocks`) | `http://localhost:18103` |
 
 ## Evidence and limits
 
@@ -234,7 +265,7 @@ On AWS, the stores live in the main VPC's data subnets, which have no route to t
 
 What has been checked (the verification logs are kept locally, not in Git):
 
-- The build passes 69 tests with no failures or skips. It covers 11 service modules, 53 use cases and 41 API contracts.
+- The full Gradle build with integration enabled passes 258 tests (0 failures/errors/skips). The disposable Docker MVP1 acceptance suite covers successful transfer and rejection paths; see the completion report.
 - ArchUnit rules R1 to R7 run in all 16 modules. Injected R1, R5 and Money-inheritance violations fail as expected.
 - Under the `skeleton` profile, 36 dev-only routes return 501 for valid requests and 400 for malformed ones. The 5 deferred APIs have no mapping.
 - Testcontainers runs against PostgreSQL, Kafka and Redis.
@@ -243,9 +274,9 @@ What has been checked (the verification logs are kept locally, not in Git):
 
 What is not done or not proven:
 
-- No business logic, authentication, ORM mapping, business SQL or real external client is implemented.
+- Banking MVP1 is implemented locally. The remaining MVP business logic and real external-institution clients are still in progress.
 - Nothing is deployed to AWS. `terraform plan` has not run against a real account, and `apply` has never run.
-- Database atomicity, concurrency, recovery after a lost response, and load have not been verified. `load-test/` has no business scenarios yet.
+- MVP1 DB atomicity, concurrent posting and recovery paths have regression coverage. Production availability and the target traffic capacity require separate verification.
 - R7 checks Java and HTTP transport calls in the main VPC. It cannot catch URLs in strings or calls made through reflection; the network rules close that gap.
 - The AWS cost figures are range estimates.
 - Comments in the Java sources are still in Korean.

@@ -1,0 +1,850 @@
+{
+  "started_at_kst": "2026-10-19T11:26:08.520916+09:00",
+  "context": {
+    "directory": "/private/tmp/pg-mvp1-e2e-njtho8_9",
+    "project": "pg_mvp1_23f6ee24",
+    "image_registry": "sinhan_mvp1_test",
+    "image_tag": "mvp1-dfe86a60",
+    "services": [
+      "api-gateway",
+      "auth",
+      "account",
+      "ledger",
+      "transfer"
+    ],
+    "account_proxy_workaround": false,
+    "otp_verified": true,
+    "source_working_tree_has_changes": true,
+    "source_sha256": "05d4890e0d8451337b62e1e0bac2865795bcf448716b5c45e73ca8702b878b79"
+  },
+  "preconditions": {
+    "account_proxy_workaround": false,
+    "opening_balance_fixture_only": true,
+    "otp_verified": true,
+    "existing_stack_isolated": true
+  },
+  "amount": "10000",
+  "currency": "KRW",
+  "financial_post_requests": 10,
+  "checks": [
+    {
+      "name": "Gateway health",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "User 1 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 1 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 1 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 2 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "No account proxy workaround is configured",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Newly opened accounts have zero balance",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Auth user profile receives verified Gateway identity",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Another user's balance is forbidden",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Another user's entries are forbidden",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Spoofed user identity is scrubbed",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Unknown account remains 404",
+      "passed": true,
+      "actual": {
+        "status": 404,
+        "code": "ACCOUNT-ACCESS-NOT_FOUND"
+      }
+    },
+    {
+      "name": "Missing OTP is rejected before reservation",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Forged OTP is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Invalid JWT signature is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "COMMON-HTTP-401"
+      }
+    },
+    {
+      "name": "Gateway denies internal endpoints",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-HTTP-403"
+      }
+    },
+    {
+      "name": "Initial balance fixture visible through Gateway -> Ledger",
+      "passed": true,
+      "actual": {
+        "source": "100000",
+        "destination": "0"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Single transfer request returns HTTP 200 COMPLETED",
+      "passed": true,
+      "actual": {
+        "status": 200,
+        "response": {
+          "transferId": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+          "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+          "status": "COMPLETED"
+        },
+        "response_trace_id": "e98536d0758bbee8700a8163666f3429"
+      }
+    },
+    {
+      "name": "Exactly one durable completed transfer",
+      "passed": true,
+      "actual": {
+        "id": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+        "transaction_id": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+        "status": "COMPLETED",
+        "amount": "10000.0000",
+        "currency": "KRW",
+        "from_account_id": "64f6f511-ceb3-42e0-8643-548b8677c007",
+        "to_account_id": "e6b7ea31-80ce-44ff-8205-fe53d430fcdc"
+      }
+    },
+    {
+      "name": "Source debited once and destination credited once",
+      "passed": true,
+      "actual": {
+        "source": "90000",
+        "destination": "10000"
+      }
+    },
+    {
+      "name": "Total money conserved",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "One journal for the same transactionId",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+          "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c"
+        }
+      ]
+    },
+    {
+      "name": "Two balanced postings, -10000 and +10000 KRW",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+          "ledgerAccountId": "0a97fbb5-dfaa-4046-9c52-e3f3cce4f920",
+          "amount": "10000.0000",
+          "currency": "KRW"
+        },
+        {
+          "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+          "ledgerAccountId": "e347b012-1266-48d1-873f-c37699415355",
+          "amount": "-10000.0000",
+          "currency": "KRW"
+        }
+      ]
+    },
+    {
+      "name": "Transfer status API returns the committed result",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 1 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 2 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Same request is 409 without another debit",
+      "passed": true,
+      "actual": {
+        "status": 409,
+        "code": "TRANSFER-DUPLICATE-REQUEST"
+      }
+    },
+    {
+      "name": "Duplicate response identifies the original transfer",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Same OTP cannot authorize another transfer",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Another user cannot use an OTP authorization",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Another user cannot debit the source account",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "TRANSFER-ACCOUNT-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Insufficient funds is 422 rather than 500",
+      "passed": true,
+      "actual": {
+        "status": 422,
+        "code": "TRANSFER-INSUFFICIENT-FUNDS"
+      }
+    },
+    {
+      "name": "Internal account lookup requires service authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Encoded internal path cannot bypass authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Encoded status PATCH cannot bypass authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Authenticated internal status change succeeds",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Suspended account cannot transfer",
+      "passed": true,
+      "actual": {
+        "status": 409,
+        "code": "TRANSFER-ACCOUNT-INACTIVE"
+      }
+    },
+    {
+      "name": "Account status can be restored",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Expired authorization cannot transfer",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Repeated OTP failures lock the draft with 423",
+      "passed": true,
+      "actual": {
+        "status": 423,
+        "code": "AUTH-4230"
+      }
+    },
+    {
+      "name": "Logout completes",
+      "passed": true,
+      "actual": {
+        "status": 204,
+        "code": null
+      }
+    },
+    {
+      "name": "Logged-out JWT cannot access protected APIs",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "COMMON-HTTP-401"
+      }
+    },
+    {
+      "name": "Fresh login remains possible after logout",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Rejected requests never changed either balance",
+      "passed": true,
+      "actual": {
+        "source": "90000",
+        "destination": "10000"
+      }
+    },
+    {
+      "name": "Only success and insufficient-funds requests were reserved",
+      "passed": true,
+      "actual": [
+        {
+          "status": "COMPLETED",
+          "count": 1
+        },
+        {
+          "status": "FAILED",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Both local Outbox rows were ACKed by Kafka",
+      "passed": true,
+      "actual": {
+        "ledger": [
+          {
+            "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+            "destination": "ledger.posted",
+            "routingKey": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+            "payload": "{\"eventId\":\"a2a3d134-146c-471a-860e-19fea2f53ab3\",\"transactionId\":\"5d705489-79e8-403c-9480-8099ee6c2a4c\",\"journalId\":\"f7d9544a-fb72-4e40-ac9c-decd2a34d4cb\",\"occurredAt\":\"2026-10-19T02:26:09.469247840Z\"}",
+            "publishedAt": "2026-10-19 02:26:10.000000",
+            "attempts": 0
+          }
+        ],
+        "transfer": [
+          {
+            "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+            "destination": "transfer.completed",
+            "routingKey": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+            "payload": "{\"eventId\":\"a2a3d134-146c-471a-860e-19fea2f53ab3\",\"transferId\":\"de3ee4b6-e9b9-44c1-9d84-1e5f01605078\",\"transactionId\":\"5d705489-79e8-403c-9480-8099ee6c2a4c\",\"journalId\":\"f7d9544a-fb72-4e40-ac9c-decd2a34d4cb\",\"occurredAt\":\"2026-10-19T02:26:09.476203048Z\"}",
+            "publishedAt": "2026-10-19T02:26:10.331857+00:00",
+            "attempts": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "ledger.posted is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "ledger.posted contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "transfer.completed is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "transfer.completed contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "Transfer consumer committed ledger.posted with zero lag",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "REST and event completion leave one completion transition",
+      "passed": true,
+      "actual": [
+        {
+          "previous_status": null,
+          "next_status": "RECEIVED",
+          "reason_code": "REQUEST_RECEIVED"
+        },
+        {
+          "previous_status": "RECEIVED",
+          "next_status": "PROCESSING",
+          "reason_code": "LEDGER_POST_REQUESTED"
+        },
+        {
+          "previous_status": "PROCESSING",
+          "next_status": "COMPLETED",
+          "reason_code": "LEDGER_POSTED"
+        }
+      ]
+    },
+    {
+      "name": "Only one transfer journal exists after all rejection probes",
+      "passed": true,
+      "actual": null
+    }
+  ],
+  "gateway_address": "http://127.0.0.1:55006",
+  "accounts": {
+    "source": "64f6f511-ceb3-42e0-8643-548b8677c007",
+    "destination": "e6b7ea31-80ce-44ff-8205-fe53d430fcdc"
+  },
+  "balances_before": {
+    "source": "100000",
+    "destination": "0"
+  },
+  "idempotency_key": "e2e-308e27648a9949d89a04b7898ccb7c65",
+  "transfer_api": {
+    "status": 200,
+    "response": {
+      "transferId": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+      "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+      "status": "COMPLETED"
+    },
+    "response_trace_id": "e98536d0758bbee8700a8163666f3429"
+  },
+  "transfer_database": {
+    "id": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+    "transaction_id": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+    "status": "COMPLETED",
+    "amount": "10000.0000",
+    "currency": "KRW",
+    "from_account_id": "64f6f511-ceb3-42e0-8643-548b8677c007",
+    "to_account_id": "e6b7ea31-80ce-44ff-8205-fe53d430fcdc"
+  },
+  "balances_after": {
+    "source": "90000",
+    "destination": "10000"
+  },
+  "journals": [
+    {
+      "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+      "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c"
+    }
+  ],
+  "postings": [
+    {
+      "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+      "ledgerAccountId": "0a97fbb5-dfaa-4046-9c52-e3f3cce4f920",
+      "amount": "10000.0000",
+      "currency": "KRW"
+    },
+    {
+      "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+      "ledgerAccountId": "e347b012-1266-48d1-873f-c37699415355",
+      "amount": "-10000.0000",
+      "currency": "KRW"
+    }
+  ],
+  "outbox": {
+    "ledger": [
+      {
+        "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+        "destination": "ledger.posted",
+        "routingKey": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+        "payload": "{\"eventId\":\"a2a3d134-146c-471a-860e-19fea2f53ab3\",\"transactionId\":\"5d705489-79e8-403c-9480-8099ee6c2a4c\",\"journalId\":\"f7d9544a-fb72-4e40-ac9c-decd2a34d4cb\",\"occurredAt\":\"2026-10-19T02:26:09.469247840Z\"}",
+        "publishedAt": "2026-10-19 02:26:10.000000",
+        "attempts": 0
+      }
+    ],
+    "transfer": [
+      {
+        "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+        "destination": "transfer.completed",
+        "routingKey": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+        "payload": "{\"eventId\":\"a2a3d134-146c-471a-860e-19fea2f53ab3\",\"transferId\":\"de3ee4b6-e9b9-44c1-9d84-1e5f01605078\",\"transactionId\":\"5d705489-79e8-403c-9480-8099ee6c2a4c\",\"journalId\":\"f7d9544a-fb72-4e40-ac9c-decd2a34d4cb\",\"occurredAt\":\"2026-10-19T02:26:09.476203048Z\"}",
+        "publishedAt": "2026-10-19T02:26:10.331857+00:00",
+        "attempts": 0
+      }
+    ]
+  },
+  "kafka": {
+    "ledger.posted": {
+      "messages": [
+        {
+          "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+          "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+          "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+          "occurredAt": "2026-10-19T02:26:09.469247840Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "ledger.posted:0:1",
+        "ledger.posted:1:0",
+        "ledger.posted:2:0"
+      ],
+      "record_count": 1
+    },
+    "transfer.completed": {
+      "messages": [
+        {
+          "eventId": "a2a3d134-146c-471a-860e-19fea2f53ab3",
+          "transferId": "de3ee4b6-e9b9-44c1-9d84-1e5f01605078",
+          "transactionId": "5d705489-79e8-403c-9480-8099ee6c2a4c",
+          "journalId": "f7d9544a-fb72-4e40-ac9c-decd2a34d4cb",
+          "occurredAt": "2026-10-19T02:26:09.476203048Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "transfer.completed:0:1",
+        "transfer.completed:1:0",
+        "transfer.completed:2:0"
+      ],
+      "record_count": 1
+    }
+  },
+  "transfer_consumer_group": [
+    "",
+    "GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                              HOST            CLIENT-ID",
+    "transfer        ledger.posted   1          0               0               0               consumer-transfer-1-75600fc6-8b49-47d3-a2f7-7769de8ddb09 /172.27.0.11    consumer-transfer-1",
+    "transfer        ledger.posted   0          1               1               0               consumer-transfer-1-75600fc6-8b49-47d3-a2f7-7769de8ddb09 /172.27.0.11    consumer-transfer-1",
+    "transfer        ledger.posted   2          0               0               0               consumer-transfer-1-75600fc6-8b49-47d3-a2f7-7769de8ddb09 /172.27.0.11    consumer-transfer-1"
+  ],
+  "state_history": [
+    {
+      "previous_status": null,
+      "next_status": "RECEIVED",
+      "reason_code": "REQUEST_RECEIVED"
+    },
+    {
+      "previous_status": "RECEIVED",
+      "next_status": "PROCESSING",
+      "reason_code": "LEDGER_POST_REQUESTED"
+    },
+    {
+      "previous_status": "PROCESSING",
+      "next_status": "COMPLETED",
+      "reason_code": "LEDGER_POSTED"
+    }
+  ],
+  "passed": true,
+  "finished_at_kst": "2026-10-19T11:26:22.738045+09:00",
+  "existing_stack_preserved": true,
+  "images": {
+    "api-gateway": {
+      "image": "sinhan_mvp1_test/api-gateway:mvp1-dfe86a60",
+      "id": "sha256:9f6ab644eed3939a6d67d2f85f4afa55af289cca768d1b5a0cec4e38b5976501",
+      "architecture": "arm64"
+    },
+    "auth": {
+      "image": "sinhan_mvp1_test/auth:mvp1-dfe86a60",
+      "id": "sha256:f67ce8b3bc797ffe765ac5ace502ff7b8a026c34c5b8d6d110d0f4a5e3c5dc7f",
+      "architecture": "arm64"
+    },
+    "account": {
+      "image": "sinhan_mvp1_test/account:mvp1-dfe86a60",
+      "id": "sha256:ddc505e9c5081be080624a2b1e4618165dc45630c0a71f93ba6467e57b0c1025",
+      "architecture": "arm64"
+    },
+    "ledger": {
+      "image": "sinhan_mvp1_test/ledger:mvp1-dfe86a60",
+      "id": "sha256:0821efcc4057c67c6902c891fea03504683a31a8bf4972820f6f1839cc19cc87",
+      "architecture": "arm64"
+    },
+    "transfer": {
+      "image": "sinhan_mvp1_test/transfer:mvp1-dfe86a60",
+      "id": "sha256:fba6a9eb684efddcd1c73ddb6d31ac3d7d5f6a16c1fe587c2fcf7968b9031ba9",
+      "architecture": "arm64"
+    }
+  },
+  "cleanup_complete": true,
+  "full_build": {
+    "total": {
+      "tests": 258,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "projects": {
+      "mock-vpc/mock-pg": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "mock-vpc/mock-clearing": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "mock-vpc/mock-kofiu": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "mock-vpc/mock-swift": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "ai-vpc/ai-gateway": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "libs/outbox": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "libs/event-contracts": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "libs/arch-rules": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "libs/common-money": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/external/swift": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/info/aml": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/info/wealth-report": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/channel/api-gateway": {
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/ledger": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/settlement": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/auth": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/payment": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/transfer": {
+        "tests": 43,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "main-vpc/core/account": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "fep-vpc/fep-adapter": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "local_deployment": {
+    "existing_data_aggregates_preserved": true,
+    "database_credentials_preserved": true,
+    "account_proxy_workaround": false,
+    "services": {
+      "api-gateway": {
+        "healthy": true,
+        "tested_image_matches": true
+      },
+      "auth": {
+        "healthy": true,
+        "tested_image_matches": true
+      },
+      "account": {
+        "healthy": true,
+        "tested_image_matches": true
+      },
+      "ledger": {
+        "healthy": true,
+        "tested_image_matches": true
+      },
+      "transfer": {
+        "healthy": true,
+        "tested_image_matches": true
+      }
+    },
+    "internal_paths": {
+      "normal": 403,
+      "encoded": 403
+    },
+    "auth_migration_v3_applied": true,
+    "gateway_health": "UP"
+  }
+}

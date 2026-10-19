@@ -9,5 +9,27 @@ spring:
     name: api-gateway
   config:
     import: classpath:platform-defaults.yml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # CMN-F02: auth(WO-A1)의 JWKS 엔드포인트. 대상은 기존 pg.clients 계약에서 해소한다.
+          jwk-set-uri: ${pg.clients.auth.base-url}/.well-known/jwks.json
 server:
   port: ${SERVER_PORT:8080}
+pg:
+  clients:
+    # 로컬 기본값. docker 프로필에서는 infra/docker/config/application-docker.yml의 pg.clients.*가 override한다.
+    auth:
+      base-url: ${AUTH_BASE_URL:http://localhost:8081}
+    account:
+      base-url: ${ACCOUNT_BASE_URL:http://localhost:8082}
+    ledger:
+      base-url: ${LEDGER_BASE_URL:http://localhost:8083}
+    transfer:
+      base-url: ${TRANSFER_BASE_URL:http://localhost:8084}
+  gateway:
+    jwt:
+      # 기본값은 auth(AuthTokenProperties) 기본 issuer/audience와 동일 — 발급 측이 바뀌면 함께 바꾼다.
+      issuer: ${PG_JWT_ISSUER:pg-platform-auth}
+      audience: ${PG_JWT_AUDIENCE:pg-platform}

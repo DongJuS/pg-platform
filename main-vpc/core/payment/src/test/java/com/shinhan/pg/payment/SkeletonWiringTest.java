@@ -34,7 +34,7 @@ class SkeletonWiringTest {
 
     @Test
     void explicitProfileAssemblesAllDeclaredFlows() {
-        SkeletonWiringAssertions.assembles(
+        SkeletonWiringAssertions.assemblesWithInfrastructure(
                 PaymentSkeletonConfiguration.class,
                 ApprovePaymentUseCase.class,
                 ApplyPaymentConfirmationUseCase.class,

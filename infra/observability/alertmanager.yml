@@ -1,0 +1,47 @@
+# [MVP2-F12] Alertmanager 로컬 구성. compose 마운트 경로 계약:
+# infra/observability/alertmanager.yml → /etc/alertmanager/alertmanager.yml (컨테이너 내부 포트 9093).
+#
+# 로컬은 외부 통합을 두지 않는다. 기본 receiver는 통합 없는 로컬 receiver로, 알림은
+# Alertmanager UI(/#/alerts)와 API로만 확인한다. 이미지 태그 계약: prom/alertmanager:v0.34.1.
+#
+# [AWS 이전 시] Slack/PagerDuty 연동은 아래 주석 블록을 활성화해 추가한다.
+# Webhook URL·시크릿은 이 파일에 평문으로 두지 않고 AWS Secrets Manager/환경 변수로 주입한다.
+
+global:
+  # 로컬에서는 SMTP 미사용. AWS 이전 시 SES/SMTP 엔드포인트를 여기에 설정한다.
+  resolve_timeout: 5m
+
+route:
+  receiver: local-only
+  group_by: [alertname, service, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # critical 알림은 더 짧은 반복 주기로 분리해 놓치지 않게 한다(로컬은 UI 확인용).
+    - matchers: [severity = "critical"]
+      receiver: local-only
+      repeat_interval: 1h
+      continue: false
+
+receivers:
+  # 통합 없는 기본 receiver. 이름만 두면 amtool 검증을 통과하고 알림은 UI에만 남는다.
+  - name: local-only
+
+  # --- [AWS 이전 시 활성화 예시] -------------------------------------------
+  # - name: slack-critical
+  #   slack_configs:
+  #     - api_url: ${SLACK_WEBHOOK_URL}   # 환경 변수/Secrets Manager 주입
+  #       channel: "#pg-platform-alerts"
+  #       title: "[{{ .CommonLabels.severity }}] {{ .CommonLabels.alertname }}"
+  #       text: "{{ range .Alerts }}{{ .Annotations.summary }} — {{ .Annotations.description }}\nrunbook: {{ .Annotations.runbook_url }}\n{{ end }}"
+  # - name: pagerduty-critical
+  #   pagerduty_configs:
+  #     - routing_key: ${PAGERDUTY_ROUTING_KEY}
+  # --------------------------------------------------------------------------
+
+inhibit_rules:
+  # 같은 서비스가 다운(critical)이면 그 서비스의 warning 알림은 억제한다.
+  - source_matchers: [alertname = "ServiceDown"]
+    target_matchers: [severity = "warning"]
+    equal: [service]

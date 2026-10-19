@@ -1,0 +1,38 @@
+# Docker-only observability; the original Prometheus configuration is unchanged.
+# Gateway metrics remain protected by its existing security configuration.
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: services
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["auth:8081"]
+        labels: {service: "auth"}
+      - targets: ["account:8082"]
+        labels: {service: "account"}
+      - targets: ["ledger:8083"]
+        labels: {service: "ledger"}
+      - targets: ["transfer:8084"]
+        labels: {service: "transfer"}
+      - targets: ["payment:8085"]
+        labels: {service: "payment"}
+      - targets: ["settlement:8086"]
+        labels: {service: "settlement"}
+      - targets: ["swift:8087"]
+        labels: {service: "swift"}
+      - targets: ["wealth-report:8088"]
+        labels: {service: "wealth-report"}
+      - targets: ["aml:8089"]
+        labels: {service: "aml"}
+      - targets: ["ai-gateway:8090"]
+        labels: {service: "ai-gateway"}
+      - targets: ["fep-adapter:8091"]
+        labels: {service: "fep-adapter"}
+      - targets: ["mock-pg:8092"]
+        labels: {service: "mock-pg"}
+      - targets: ["mock-swift:8093"]
+        labels: {service: "mock-swift"}
+      - targets: ["mock-kofiu:8094"]
+        labels: {service: "mock-kofiu"}
+      - targets: ["mock-clearing:8095"]
+        labels: {service: "mock-clearing"}

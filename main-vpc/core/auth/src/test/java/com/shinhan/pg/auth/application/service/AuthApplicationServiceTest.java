@@ -273,6 +273,12 @@ class AuthApplicationServiceTest {
             byId.put(value.id(), value);
         }
 
+        private final Map<UUID,String> uses = new HashMap<>();
+        @Override public boolean useForTransfer(UUID proof, UUID user, String key, String hash, Instant now) {
+            var value = key + ":" + hash;
+            return uses.putIfAbsent(proof, value) == null || value.equals(uses.get(proof));
+        }
+
         /** 최신 증적을 반환한다(실제 어댑터는 created_at 내림차순과 동일하게 삽입 순서의 마지막). */
         @Override
         public Optional<OtpProof> findLatestByUserIdAndTransferDraftId(UUID userId, UUID draftId) {

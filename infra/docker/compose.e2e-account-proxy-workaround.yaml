@@ -1,0 +1,19 @@
+# TEMPORARY E2E-ONLY workaround — NOT a fix. Delete after Backend fixes the code.
+#
+# Bug (2026-10-19 E2E): account fails to boot with
+#   "Could not generate CGLIB subclass of class
+#    com.shinhan.pg.account.application.service.AccountApplicationService"
+# Root cause: AccountApplicationService is declared `final` while having
+# @Transactional methods, and Spring Boot's default spring.aop.proxy-target-class=true
+# forces CGLIB subclassing, which cannot proxy final classes.
+# Proper fix (Backend owner): remove `final` or move @Transactional off the bean —
+# DO NOT merge this file into any canonical stack; it only exists so the rest of
+# the MVP1 E2E flow can be exercised locally. SPRING_AOP_PROXY_TARGET_CLASS=false
+# switches to JDK dynamic proxies; AccountController injects the use-case
+# interfaces, so proxying by interface is sufficient.
+name: sinhan_project_docker
+
+services:
+  account:
+    environment:
+      SPRING_AOP_PROXY_TARGET_CLASS: "false"

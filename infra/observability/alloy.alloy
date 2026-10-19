@@ -1,0 +1,61 @@
+// [WO-D, 2026-10-18] macOS Docker Desktop 로컬 로그 수집 최소 경로 (Grafana Alloy).
+//
+// 배경: promtail의 docker 서비스 디스커버리는 컨테이너 로그 "파일"(/var/lib/docker/
+// containers)을 읽는데, Docker Desktop은 그 파일이 Linux VM 안에 있어 macOS 호스트에서
+// 접근할 수 없다 — promtail.yml이 로컬에서 실패한 원인. Alloy의 loki.source.docker는
+// 로그 파일이 아니라 Docker daemon API(mounted /var/run/docker.sock)로 스트림하므로
+// macOS Docker Desktop에서도 동작한다. Java 변경 0.
+//
+// 전제(지시서 WO-D):
+//   - docker.sock은 compose에서 읽기 전용(ro) 마운트, 로컬 개발 전용.
+//   - 이 프로젝트(com.docker.compose.project=sinhan_project_docker)의 컨테이너만 수집.
+//   - 로그 수집 전용. Alloy로 메트릭/트레이스를 이중 수집하지 않는다
+//     (메트릭/트레이스 경로는 Prometheus scrape / OTLP push가 이미 담당).
+
+logging {
+	level  = "info"
+	format = "logfmt"
+}
+
+// Docker daemon API로 이 프로젝트의 컨테이너만 목록화한다. 필터는 API 레벨에서
+// 적용되므로 다른 프로젝트(예: sinhan_project) 컨테이너는 대상에 오르지도 않는다.
+discovery.docker "project" {
+	host = "unix:///var/run/docker.sock"
+
+	filter {
+		name   = "label"
+		values = ["com.docker.compose.project=sinhan_project_docker"]
+	}
+}
+
+// compose 서비스명을 service 라벨로, Docker 로그 스트림을 stream 라벨로 매핑한다.
+// __meta_docker_container_log_stream은 discovery 시점이 아니라 loki.source.docker가
+// 엔트리를 읽을 때 붙이는 메타 라벨이므로, 같은 rules를 loki.source.docker의
+// relabel_rules에도 넘겨 엔트리 레벨에서 stream 라벨이 부여되게 한다.
+// (메타 라벨(__* 접두)은 relabel 없이는 Loki로 전송되지 않는다.)
+discovery.relabel "project" {
+	targets = discovery.docker.project.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		target_label  = "service"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_log_stream"]
+		target_label  = "stream"
+	}
+}
+
+loki.source.docker "project" {
+	host          = "unix:///var/run/docker.sock"
+	targets       = discovery.relabel.project.output
+	relabel_rules = discovery.relabel.project.rules
+	forward_to    = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

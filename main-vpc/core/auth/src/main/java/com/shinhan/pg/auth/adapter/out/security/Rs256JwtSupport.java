@@ -33,6 +33,16 @@ public final class Rs256JwtSupport {
         this.keyId = java.util.Objects.requireNonNull(keyId);
     }
 
+    /** JWKS 노출용 공개키 접근자. 개인키는 절대 반환하지 않는다. */
+    public RSAPublicKey publicKey() {
+        return publicKey;
+    }
+
+    /** JWKS 노출용 key id 접근자. 발급 토큰 header의 kid와 동일 값이다. */
+    public String keyId() {
+        return keyId;
+    }
+
     /** 개발용 임시 키쌍 생성. 서버 재시작 시 이전 토큰이 전부 무효화되므로 프로필 기본값으로만 사용한다. */
     public static Rs256JwtSupport generateEphemeral(String keyId) {
         try {

@@ -17,6 +17,10 @@ public interface OtpProofRepository {
 
     void save(OtpProof value);
 
+    /** Atomically bind the proof to one user/request. An identical retry is allowed; a different use is rejected. */
+    boolean useForTransfer(UUID proofId, UUID userId, String idempotencyKey, String requestHash, java.time.Instant now);
+
+
     /** 사용자·이체 초안의 최근 검증 시도를 조회한다. 없으면 최초 시도다. */
     Optional<OtpProof> findLatestByUserIdAndTransferDraftId(UUID userId, UUID transferDraftId);
 }

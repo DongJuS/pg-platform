@@ -52,7 +52,7 @@ public class AuthApplicationService
                 RefreshTokenUseCase,
                 LogoutUseCase,
                 GetCurrentUserUseCase,
-                VerifyOtpUseCase {
+                VerifyOtpUseCase, com.shinhan.pg.auth.application.port.in.ConsumeOtpUseCase {
     private final PasswordHashPort passwordHashPort;
     private final TokenIssuancePort tokenIssuancePort;
     private final RevokedTokenStorePort revokedTokenStorePort;
@@ -180,14 +180,14 @@ public class AuthApplicationService
         if (command.authorization() == null || !command.authorization().startsWith("Bearer ")) {
             return;
         }
+        TokenIssuancePort.VerifiedAccessToken verified;
         try {
-            var verified =
-                    tokenIssuancePort.verifyAccessToken(
-                            command.authorization().substring("Bearer ".length()));
-            revokedTokenStorePort.revokeUntilExpiry(verified.jti(), verified.expiresAt());
+            verified = tokenIssuancePort.verifyAccessToken(command.authorization().substring("Bearer ".length()));
         } catch (RuntimeException invalidToken) {
-            // TODO[CONTRACT]: 유효하지 않은 토큰의 로그아웃 응답(204 vs 401)은 최종 계약 후 조정한다.
+            return;
         }
+        // Redis failure must not be reported as a successful logout.
+        revokedTokenStorePort.revokeUntilExpiry(verified.jti(), verified.expiresAt());
     }
 
     /** [MVP1-F05] 내 정보 조회. 오류: 404 USER_NOT_FOUND. */
@@ -211,6 +211,8 @@ public class AuthApplicationService
     @Override
     @Transactional
     public VerifyOtpResult verifyOtp(VerifyOtpCommand command) {
+        if (command == null || command.actorUserId() == null || command.transferDraftId() == null)
+            throw new ApplicationException(AuthErrorCode.OTP_INVALID);
         var now = Instant.now();
         var current =
                 otpProofRepository.findLatestByUserIdAndTransferDraftId(
@@ -253,6 +255,40 @@ public class AuthApplicationService
                         0);
         otpProofRepository.save(proof);
         return new VerifyOtpResult(otpToken(proof.id(), expiresAt), expiresAt);
+    }
+
+    /** Consume a signed, user-bound proof once per logical transfer. No money is moved here. */
+    @Override @Transactional
+    public void consumeOtp(com.shinhan.pg.auth.application.command.ConsumeOtpCommand command) {
+        try {
+            if (command == null || command.actorUserId() == null || command.otpToken() == null
+                    || command.otpToken().length() > 2048 || command.idempotencyKey() == null
+                    || command.idempotencyKey().isBlank() || command.idempotencyKey().length() > 255
+                    || command.fromAccountId() == null || command.toAccountId() == null
+                    || command.amount() == null || command.amount().signum() <= 0 || command.currency() == null)
+                throw new IllegalArgumentException();
+            var token = command.otpToken().split("\\.", -1);
+            if (token.length != 3 || !"v1".equals(token[0])) throw new IllegalArgumentException();
+            var body = new String(java.util.Base64.getUrlDecoder().decode(token[1]), java.nio.charset.StandardCharsets.UTF_8);
+            var fields = body.split("\\.", -1);
+            if (fields.length != 2) throw new IllegalArgumentException();
+            var proofId = UUID.fromString(fields[0]);
+            var expiry = Instant.ofEpochSecond(Long.parseLong(fields[1]));
+            var signature = CryptoSupport.hmacSha256Hex(otpServerSecret, "otp-token:" + body);
+            if (!java.security.MessageDigest.isEqual(signature.getBytes(java.nio.charset.StandardCharsets.US_ASCII), token[2].getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
+                throw new IllegalArgumentException();
+            var now = Instant.now();
+            var proof = otpProofRepository.findById(proofId).orElseThrow(IllegalArgumentException::new);
+            if (!command.actorUserId().equals(proof.userId()) || proof.consumedAt() == null || proof.failureCount() != 0
+                    || !expiry.isAfter(now) || proof.expiresAt().getEpochSecond() != expiry.getEpochSecond())
+                throw new IllegalArgumentException();
+            var requestHash = CryptoSupport.sha256Hex(command.fromAccountId() + ":" + command.toAccountId()
+                + ":" + command.amount().stripTrailingZeros().toPlainString() + ":" + command.currency());
+            if (!otpProofRepository.useForTransfer(proofId, command.actorUserId(), command.idempotencyKey(), requestHash, now))
+                throw new IllegalArgumentException();
+        } catch (IllegalArgumentException | java.util.NoSuchElementException | java.time.DateTimeException invalid) {
+            throw new ApplicationException(AuthErrorCode.OTP_INVALID);
+        }
     }
 
     private RefreshTokenSession issueRefreshSession(UUID userId, UUID familyId) {

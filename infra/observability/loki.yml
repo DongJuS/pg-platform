@@ -1,0 +1,51 @@
+# [MVP2-F12] Loki 로컬 단일 노드 구성. compose 마운트 경로 계약:
+# infra/observability/loki.yml → /etc/loki/loki.yml (HTTP 3100). 이미지 태그 계약: grafana/loki:3.6.18.
+# [AWS 이전 시] object_store를 s3로 교체하고 retention/권한(IAM)은 별도 합의. 현재 보존 168h는 초기값.
+#
+# 수집 경로 주의: Docker Desktop(macOS)에서는 컨테이너 로그 파일이 VM 내부 FS에 있어
+# promtail의 docker 서비스 디스커버리로 수집할 수 없다. 로컬 로그 수집 경로는 "확인 필요"
+# (RUNBOOK.md와 promtail.yml 주석 참조 — promtail.yml은 Linux/AWS 참조용).
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 보존 초기값 7일(로컬). 금융 로그 보존 정책 미정 — 확정 전 임의 적용 금지.
+  retention_period: 168h
+  allow_structured_metadata: true
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100

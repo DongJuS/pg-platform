@@ -18,4 +18,10 @@ public interface JournalRepository {
     void save(Journal value);
 
     Optional<Journal> findByTransactionId(UUID transactionId);
+
+    /**
+     * 같은 로컬 트랜잭션에 기록된 ledger.posted Outbox 행의 eventId를 복구한다.
+     * 멱등 재조회(F13)와 반영 결과 조회(F14)가 원래 이벤트 식별자를 돌려주는 데 사용한다.
+     */
+    Optional<UUID> findPostedEventId(UUID transactionId);
 }

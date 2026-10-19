@@ -63,8 +63,8 @@ public class AuthSkeletonConfiguration {
     }
 
     @Bean
-    public RevokedTokenStorePort revokedTokenStorePort(StringRedisTemplate redisTemplate) {
-        return new RevokedTokenRedisAdapter(redisTemplate);
+    public RevokedTokenStorePort revokedTokenStorePort(StringRedisTemplate redisTemplate, Environment environment) {
+        return new RevokedTokenRedisAdapter(redisTemplate, environment.getProperty("pg.auth.revocation-key-prefix", "auth:revoked:jti:"));
     }
 
     @Bean

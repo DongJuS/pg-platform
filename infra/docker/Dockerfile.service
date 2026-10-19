@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+#
+# pg-platform service image (CMN-F03) — single-stage runtime packaging.
+#
+# The bootJar is built by Gradle on the host/CI (`./gradlew :<service>:bootJar`),
+# so no multi-stage build is needed here; this Dockerfile only packages the jar.
+# The image is the deployable unit that will later move to ECR/ECS unchanged.
+#
+# Build contract (must match the compose `build:` blocks):
+#   docker build -f infra/docker/Dockerfile.service \
+#     --build-arg JAR_PATH=<module-path>/build/libs/<service>-0.1.0-SNAPSHOT.jar \
+#     -t pg-platform/<service>:<immutable-tag> <repository root>
+#
+# Immutable-tag principle: tag with the git short SHA (scripts/build-images.sh
+# does this). Never publish or deploy a mutable `:latest` tag.
+ARG RUNTIME_IMAGE=eclipse-temurin:21-jre-alpine
+FROM ${RUNTIME_IMAGE}
+
+# Non-root runtime user. Fixed UID/GID keeps ECS task definitions, ECR image
+# scans and read-only root filesystems predictable.
+RUN addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
+
+WORKDIR /app
+
+# JAR_PATH is relative to the build context (repository root). Gradle must have
+# produced the bootJar before docker build; scripts/build-images.sh enforces it.
+ARG JAR_PATH
+COPY --chown=10001:10001 ${JAR_PATH} /app/app.jar
+
+USER 10001:10001
+
+# Container-aware heap cap (task requirement: 65%). Operators may extend or
+# override via JAVA_OPTS in compose/ECS task definitions without rebuilding.
+# Note: JAVA_TOOL_OPTIONS also works and is read by the JVM directly.
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=65"
+
+# SERVER_PORT is injected per service by compose/ECS (8080-8095); 8080 is only
+# a documentation default for the health check below.
+#
+# eclipse-temurin *-alpine ships BusyBox wget, so an in-image HEALTHCHECK works.
+# If the base image ever moves to a distro without wget/curl, remove this block
+# and let compose/ECS own health checking instead.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=12 \
+    CMD wget -q -O /dev/null "http://127.0.0.1:${SERVER_PORT:-8080}/actuator/health" || exit 1
+
+# `exec` makes the JVM PID 1, so SIGTERM reaches Spring Boot directly and the
+# default graceful shutdown runs (no wrapper process, no javaagent — the app
+# exports OTLP itself).
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

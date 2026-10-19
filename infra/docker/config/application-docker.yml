@@ -1,0 +1,52 @@
+# Loaded only by the additive Compose configuration, via /config/.
+# The image itself is environment-neutral; AWS continues to use its existing configuration.
+spring:
+  config:
+    activate:
+      on-profile: docker
+  kafka:
+    security:
+      protocol: PLAINTEXT
+  data:
+    redis:
+      ssl:
+        enabled: false
+outbox:
+  # Several stores/consumers are still skeletons. Enable deliberately after their contracts
+  # and atomic DB writes are implemented. Docker startup must not silently start money flows.
+  enabled: false
+pg:
+  clients:
+    # TODO[CLIENT]: configuration contract only; existing REST skeletons do not bind these
+    # properties yet. Wire each caller's own adapter/out client when implementing that flow.
+    # Do not add a shared HTTP client or bypass FEP/AI Gateway to make a demo work.
+    auth:
+      base-url: ${AUTH_BASE_URL:http://auth:8081}
+    account:
+      base-url: ${ACCOUNT_BASE_URL:http://account:8082}
+    ledger:
+      base-url: ${LEDGER_BASE_URL:http://ledger:8083}
+    transfer:
+      base-url: ${TRANSFER_BASE_URL:http://transfer:8084}
+    payment:
+      base-url: ${PAYMENT_BASE_URL:http://payment:8085}
+    settlement:
+      base-url: ${SETTLEMENT_BASE_URL:http://settlement:8086}
+    swift:
+      base-url: ${SWIFT_BASE_URL:http://swift:8087}
+    wealth-report:
+      base-url: ${WEALTH_REPORT_BASE_URL:http://wealth-report:8088}
+    aml:
+      base-url: ${AML_BASE_URL:http://aml:8089}
+    ai-gateway:
+      base-url: ${AI_GATEWAY_BASE_URL:http://ai-gateway:8090}
+    fep-adapter:
+      base-url: ${FEP_BASE_URL:http://fep-adapter:8091}
+    mock-pg:
+      base-url: ${MOCK_PG_BASE_URL:http://mock-pg:8092}
+    mock-swift:
+      base-url: ${MOCK_SWIFT_BASE_URL:http://mock-swift:8093}
+    mock-kofiu:
+      base-url: ${MOCK_KOFIU_BASE_URL:http://mock-kofiu:8094}
+    mock-clearing:
+      base-url: ${MOCK_CLEARING_BASE_URL:http://mock-clearing:8095}

@@ -1,8 +1,22 @@
 apiVersion: 1
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+    editable: false
+  # [MVP2-F12] 추가 데이터소스. compose 마운트 대상 컨테이너 이름(tempo, loki)과 일치해야 한다.
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
     editable: false

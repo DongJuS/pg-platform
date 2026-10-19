@@ -1,5 +1,16 @@
 global:
   scrape_interval: 15s
+
+# [MVP2-F12] 알림 룰과 Alertmanager 연결. 룰 내용·임계값 근거는 prometheus-alerts.yml과
+# RUNBOOK.md를 참조. compose 마운트 경로 계약: /etc/prometheus/prometheus-alerts.yml.
+rule_files:
+  - /etc/prometheus/prometheus-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
+
 scrape_configs:
   - job_name: transfer
     metrics_path: /actuator/prometheus

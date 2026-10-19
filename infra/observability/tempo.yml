@@ -1,0 +1,38 @@
+# [MVP2-F12] Tempo 로컬 단일 노드(single-binary) 구성. compose 마운트 경로 계약:
+# infra/observability/tempo.yml → /etc/tempo/tempo.yml (HTTP 3200). 이미지 태그 계약: grafana/tempo:3.0.4.
+# Tempo 3.0 기준: ingester/compactor 최상위 블록은 제거됨(2.x와 비호환). 단일 바이너리는
+# distributor → live-store → local block 경로를 사용한다(공식 single-binary 예제 기반).
+# otel-collector가 traces를 OTLP gRPC(tempo:4317)로 보낸다(otel-collector.yml의 otlp/tempo exporter).
+# [AWS 이전 시] storage.trace.backend를 s3로 교체. 보존 기간은 별도 합의 필요(초기값 168h).
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+overrides:
+  defaults:
+    compaction:
+      # 보존 초기값 7일(로컬). 금융 보존 정책 미정 — 확정 전 임의 적용 금지.
+      block_retention: 168h
+
+usage_report:
+  reporting_enabled: false

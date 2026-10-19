@@ -1,0 +1,17 @@
+# service path port engine database
+api-gateway main-vpc/channel/api-gateway 8080 none none
+auth main-vpc/core/auth 8081 postgres auth_db
+account main-vpc/core/account 8082 mariadb account_db
+ledger main-vpc/core/ledger 8083 mariadb ledger_db
+transfer main-vpc/core/transfer 8084 postgres transfer_db
+payment main-vpc/core/payment 8085 postgres payment_db
+settlement main-vpc/core/settlement 8086 postgres settlement_db
+swift main-vpc/external/swift 8087 postgres swift_db
+wealth-report main-vpc/info/wealth-report 8088 postgres wealth_report_db
+aml main-vpc/info/aml 8089 postgres aml_db
+ai-gateway ai-vpc/ai-gateway 8090 postgres ai_gateway_db
+fep-adapter fep-vpc/fep-adapter 8091 postgres fep_adapter_db
+mock-pg mock-vpc/mock-pg 8092 none none
+mock-swift mock-vpc/mock-swift 8093 none none
+mock-kofiu mock-vpc/mock-kofiu 8094 none none
+mock-clearing mock-vpc/mock-clearing 8095 none none

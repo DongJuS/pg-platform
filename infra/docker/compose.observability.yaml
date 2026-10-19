@@ -1,0 +1,255 @@
+# Standalone override for infra/docker/compose.yaml. Combine, never use alone:
+#   docker compose --env-file <env> -f infra/docker/compose.yaml \
+#     -f infra/docker/compose.observability.yaml up -d
+# It adds alertmanager/tempo/loki/localstack/kafka-exporter and re-mounts
+# prometheus/grafana/otel-collector configs.
+# It changes nothing in the base files; dropping the -f flag restores base behavior.
+# Details: infra/docker/OBSERVABILITY.md
+name: sinhan_project_docker
+
+services:
+  # --- Existing services: merged overrides (volumes merge by target path) --------
+
+  prometheus:
+    # Replaces the base config mount with the alerting-aware copy and adds the rules.
+    volumes:
+      - ./config/prometheus.observability.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus-alerts.yml:/etc/prometheus/rules/alerts.yml:ro
+    depends_on:
+      dev-access: {condition: service_started}
+      alertmanager: {condition: service_started}
+
+  grafana:
+    # Base already mounts ../observability/grafana-datasources.yml (Prometheus+Tempo+Loki).
+    # This adds dashboard provisioning only.
+    volumes:
+      - ../observability/dashboards:/etc/grafana/provisioning/dashboards:ro
+
+  otel-collector:
+    # Swaps the shared collector config for the observability variant that adds the
+    # logs pipeline (otlphttp exporter -> loki /otlp/v1/logs). The shared file
+    # (infra/observability/otel-collector.yml) keeps only traces/metrics so a
+    # base-only stack never references loki: with a logs pipeline in the shared
+    # file, the base collector's exporter would retry forever against a missing
+    # loki, fill its send queue and return export errors to the apps.
+    # Compose merges volumes by target path, so this replaces the base mount.
+    # No depends_on on loki on purpose: otel-collector has no profile, and the
+    # otlphttp exporter retries until loki accepts connections.
+    volumes:
+      - ./config/otel-collector.observability.yml:/etc/otelcol-contrib/config.yaml:ro
+
+  # OTLP log export (Spring Boot 3.5 management.otlp.logging.endpoint) for all 16
+  # app services. The base x-app anchor cannot be shared across files, so each
+  # service gets its own environment merge block (compose merges environment keys).
+  # Reachability: data-zone apps reach otel-collector via `data`, mocks via `mock`.
+  api-gateway:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  auth:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  account:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  ledger:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  transfer:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  payment:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  settlement:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  swift:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  wealth-report:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  aml:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  ai-gateway:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  fep-adapter:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  mock-pg:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  mock-swift:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  mock-kofiu:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+  mock-clearing:
+    environment:
+      MANAGEMENT_OTLP_LOGGING_ENDPOINT: http://otel-collector:4318/v1/logs
+
+  # --- New services ---------------------------------------------------------------
+
+  kafka-exporter:
+    # Kafka consumer-lag observation path (WO-3a). danielqsj/kafka-exporter scrapes
+    # broker-side consumer-group offsets and exports kafka_consumergroup_lag et al.
+    # No port publishing: prometheus scrapes it directly on the `data` network.
+    # NOTE: consumer groups that never committed offsets yield no lag series —
+    # with consumers still unimplemented (skeletons), an empty series is expected;
+    # the completion criterion is the scrape path (target UP), not data presence.
+    profiles: [observability]
+    image: danielqsj/kafka-exporter:v1.10.0@sha256:346a53c2489a3530790d01f7b96632496d0d58926662f4c35bb65f569db2ab42
+    command:
+      - --kafka.server=kafka:19092
+      - --kafka.version=3.9.1
+    networks: [data]
+    depends_on:
+      kafka: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO- http://localhost:9308/metrics >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      retries: 24
+    mem_limit: 96m
+
+  alertmanager:
+    profiles: [observability]
+    image: prom/alertmanager:v0.34.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ../observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks: [data, obs-ingress]
+    # dev-access has no free listener slot; publish directly on loopback instead.
+    # Ports only work because obs-ingress is a non-internal bridge: a container
+    # attached only to internal networks gets no gateway, so Docker silently
+    # skips the port publishing (observed during verification).
+    ports:
+      - "127.0.0.1:39093:9093"
+    healthcheck:
+      test: [CMD-SHELL, "wget -qO- http://localhost:9093/-/ready >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      retries: 24
+    mem_limit: 96m
+
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:3.0.4
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ../observability/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    networks: [data, obs-ingress]
+    ports:
+      - "127.0.0.1:33200:3200"
+    # grafana/tempo is distroless (only /tempo — no shell, wget or curl), so an
+    # HTTP probe cannot run inside the container. This is a liveness probe only;
+    # true readiness is verified externally: curl :33200/ready or the Prometheus
+    # `up{job="tempo"}` scrape.
+    healthcheck:
+      test: [CMD, "/tempo", "-version"]
+      interval: 5s
+      retries: 24
+    mem_limit: 256m
+
+  loki:
+    profiles: [observability]
+    image: grafana/loki:3.6.18
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ../observability/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    networks: [data, obs-ingress]
+    ports:
+      - "127.0.0.1:33100:3100"
+    # grafana/loki is distroless (only /usr/bin/loki — no shell, wget or curl),
+    # so an HTTP probe cannot run inside the container. Liveness probe only;
+    # true readiness: curl :33100/ready or `up{job="loki"}` in Prometheus.
+    healthcheck:
+      test: [CMD, "/usr/bin/loki", "-version"]
+      interval: 5s
+      retries: 24
+    mem_limit: 256m
+
+  alloy:
+    # Local container-log collection path (WO-D). Grafana Alloy reads container
+    # logs via the Docker daemon API (loki.source.docker), not log files, so it
+    # works on macOS Docker Desktop — unlike promtail's docker SD, which needs
+    # /var/lib/docker/containers on the host and stays a Linux/AWS reference.
+    # Logs only: metrics/traces keep their existing paths (Prometheus scrape /
+    # OTLP push) and are deliberately not duplicated through Alloy.
+    profiles: [observability]
+    image: grafana/alloy:v1.11.3@sha256:8c7256f412feb9f5f48f9f6f9394dc97ca887f63dea9304f347970ecc1787669
+    volumes:
+      # Docker socket: READ-ONLY mount. Alloy uses it to list containers and
+      # stream logs, but the socket grants host-root-equivalent power, so this
+      # stack is local-development only and the socket must never be mounted rw.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../observability/alloy.alloy:/etc/alloy/config.alloy:ro
+    networks: [data]
+    depends_on:
+      loki: {condition: service_started}
+    # grafana/alloy ships a shell but no wget/curl, so an HTTP probe cannot run
+    # inside the container. Liveness probe only; true readiness is verified
+    # externally: `docker exec <alloy> wget` is unavailable — query Loki for an
+    # actual log line, or check the Alloy UI via a temporary port forward.
+    healthcheck:
+      test: [CMD, "/bin/alloy", "--version"]
+      interval: 5s
+      retries: 24
+    mem_limit: 128m
+
+  localstack:
+    # S3 substitute for local development (ReportStoragePort future implementation).
+    # Separate profile: it is data infrastructure, not observability.
+    profiles: [localstack]
+    image: localstack/localstack:3.8.1
+    environment:
+      SERVICES: s3
+      PERSISTENCE: '1'
+    volumes:
+      - localstack-data:/var/lib/localstack
+    networks: [data, obs-ingress]
+    ports:
+      - "127.0.0.1:34566:4566"
+    healthcheck:
+      test: [CMD-SHELL, "curl -sf http://localhost:4566/_localstack/health >/dev/null || exit 1"]
+      interval: 5s
+      retries: 24
+    mem_limit: 512m
+
+  localstack-init:
+    # One-shot bucket bootstrap. Idempotent: skips creation when the bucket exists.
+    profiles: [localstack]
+    image: amazon/aws-cli:2.27.50
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        aws --endpoint-url http://localstack:4566 s3api head-bucket
+        --bucket pg-platform-local-reports 2>/dev/null
+        || aws --endpoint-url http://localstack:4566 s3 mb
+        s3://pg-platform-local-reports
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-2
+    networks: [data]
+    depends_on:
+      localstack: {condition: service_healthy}
+    mem_limit: 96m
+
+# Non-internal loopback publishing bridge for the new observability/S3 services.
+# The base VPC-zone networks stay internal and untouched; this mirrors the
+# dev-ingress pattern without modifying the dev-access HAProxy configuration.
+networks:
+  obs-ingress: {}
+
+volumes:
+  alertmanager-data:
+  tempo-data:
+  loki-data:
+  localstack-data:

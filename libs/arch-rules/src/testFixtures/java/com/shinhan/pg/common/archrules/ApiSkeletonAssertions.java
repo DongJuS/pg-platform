@@ -37,6 +37,7 @@ public final class ApiSkeletonAssertions {
         try (var inactive = new AnnotationConfigApplicationContext()) {
             inactive.register(configuration);
             inactive.register(controllers);
+            inactive.register(SkeletonWiringAssertions.InfrastructureStubConfiguration.class);
             inactive.refresh();
             for (var type : controllers)
                 assertTrue(
@@ -47,6 +48,7 @@ public final class ApiSkeletonAssertions {
             context.getEnvironment().setActiveProfiles("skeleton");
             context.register(configuration);
             context.register(controllers);
+            context.register(SkeletonWiringAssertions.InfrastructureStubConfiguration.class);
             context.refresh();
             var beans = Arrays.stream(controllers).map(context::getBean).toArray();
             var mvc = MockMvcBuilders.standaloneSetup(beans).setControllerAdvice(advice).build();
