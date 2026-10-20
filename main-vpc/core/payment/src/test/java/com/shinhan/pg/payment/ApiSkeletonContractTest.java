@@ -1,83 +1,60 @@
 package com.shinhan.pg.payment;
 
-import com.shinhan.pg.common.archrules.ApiSkeletonAssertions;
+import static org.mockito.Mockito.mock;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.shinhan.pg.payment.adapter.in.web.PaymentController;
-import com.shinhan.pg.payment.adapter.in.web.PaymentReconciliationController;
+import com.shinhan.pg.payment.adapter.in.web.PaymentExceptionHandler;
 import com.shinhan.pg.payment.adapter.in.web.PaymentWebhookController;
 import com.shinhan.pg.payment.adapter.in.web.PlatformExceptionHandler;
-import com.shinhan.pg.payment.config.PaymentSkeletonConfiguration;
+import com.shinhan.pg.payment.adapter.out.webhook.PgWebhookDecoderAdapter;
+import com.shinhan.pg.payment.application.port.out.FepPaymentPort;
+import com.shinhan.pg.payment.application.port.out.LedgerPostingPort;
+import com.shinhan.pg.payment.application.port.out.PaymentStore;
+import com.shinhan.pg.payment.application.service.PaymentApplicationService;
 
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ApiSkeletonContractTest {
     @Test
-    void concreteEndpointsStayInactiveByDefaultAndReturn501WhenEnabled() throws Exception {
-        ApiSkeletonAssertions.verify(
-                PaymentSkeletonConfiguration.class,
-                new Class<?>[] {
-                    PaymentController.class,
-                    PaymentWebhookController.class,
-                    PaymentReconciliationController.class
-                },
-                new PlatformExceptionHandler(),
-                List.of(
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F01",
-                                "POST",
-                                "/api/v1/payments",
-                                "{\"orderReference\": \"mock-value\", \"merchantId\":"
-                                    + " \"00000000-0000-0000-0000-000000000002\", \"amount\": 1000,"
-                                    + " \"currency\": \"KRW\"}",
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F02",
-                                "GET",
-                                "/api/v1/payments/00000000-0000-0000-0000-000000000002",
-                                null,
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F03",
-                                "POST",
-                                "/api/v1/payments/00000000-0000-0000-0000-000000000002/cancel",
-                                "{\"reason\": \"mock-value\"}",
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F04",
-                                "POST",
-                                "/api/v1/payments/00000000-0000-0000-0000-000000000002/refunds",
-                                "{\"amount\": 1000, \"reason\": \"mock-value\"}",
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F05",
-                                "GET",
-                                "/api/v1/payments/00000000-0000-0000-0000-000000000002/refunds",
-                                null,
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F06",
-                                "POST",
-                                "/mock/v1/pg/webhooks",
-                                "{\"eventId\": \"00000000-0000-0000-0000-000000000002\","
-                                    + " \"paymentId\": \"00000000-0000-0000-0000-000000000002\","
-                                    + " \"providerCode\": \"mock-value\", \"eventType\":"
-                                    + " \"mock-value\", \"occurredAt\": \"2026-10-18T00:00:00Z\","
-                                    + " \"externalTransactionId\": \"mock-value\"}",
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F08",
-                                "POST",
-                                "/internal/v1/payments/reconciliation-runs",
-                                "{\"businessDate\": \"2026-10-18\"}",
-                                ""),
-                        new ApiSkeletonAssertions.Call(
-                                "MVP2-F09",
-                                "GET",
-                                "/internal/v1/payments/reconciliation-runs/00000000-0000-0000-0000-000000000002",
-                                null,
-                                "")),
-                "/api/v1/payments",
-                "/api/v1/payments/invalid-id");
+    void unauthenticatedPaymentAndInvalidWebhookAreRejectedBeforeEffects() throws Exception {
+        var app =
+                new PaymentApplicationService(
+                        mock(PaymentStore.class),
+                        mock(FepPaymentPort.class),
+                        mock(LedgerPostingPort.class),
+                        (a, b, c, d) -> {},
+                        new PgWebhookDecoderAdapter(""),
+                        false);
+        var mvc =
+                MockMvcBuilders.standaloneSetup(
+                                new PaymentController(app, app, app, app, app),
+                                new PaymentWebhookController(app))
+                        .setControllerAdvice(
+                                new PaymentExceptionHandler(), new PlatformExceptionHandler())
+                        .build();
+        mvc.perform(
+                        post("/api/v1/payments")
+                                .contentType("application/json")
+                                .header("Idempotency-Key", "key")
+                                .content("{\"amount\":30000,\"currency\":\"KRW\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        post("/internal/v1/payments/pg/webhooks")
+                                .contentType("application/json")
+                                .header("X-PG-Signature", "bad")
+                                .requestAttr("callerServiceId", "fep-adapter")
+                                .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        post("/api/v1/payments")
+                                .contentType("application/json")
+                                .header("Idempotency-Key", "key")
+                                .content("{broken"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/mock/v1/pg/webhooks").contentType("application/json").content("{}"))
+                .andExpect(status().isNotFound());
     }
 }

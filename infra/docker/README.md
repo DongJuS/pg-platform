@@ -31,7 +31,7 @@ Existing env files can be upgraded without changing database passwords:
 python3 infra/docker/init-env.py /private/tmp/sinhan-docker.env --upgrade
 ```
 
-The new `INTERNAL_SERVICE_TOKEN` is injected only into Auth/Account/Ledger/Transfer;
+The `INTERNAL_SERVICE_TOKEN` is injected into Auth/Account/Ledger/Transfer and the MVP2 Payment/FEP boundary;
 `AUTH_OTP_SECRET_HEX` is injected only into Auth. Keep both outside Git and images.
 For an automated disposable acceptance run (valid OTP transfer and rejection cases):
 
@@ -43,7 +43,7 @@ For a persistent setup, use a private directory outside the repository rather th
 `/private/tmp`. `init-env.py` sets mode 0600 and refuses to overwrite existing files.
 Keep the env file for as long as you keep the volumes: changing passwords in the env
 file does not rotate users in an already initialized database. Init scripts run only
-on empty volumes. They create nine PostgreSQL databases and two MariaDB databases,
+on empty volumes. They create ten PostgreSQL databases and two MariaDB databases,
 with a separate application login and ownership/grants for each service database. The Docker-only
 APP_DB_PASSWORD must be hexadecimal; the helper generates it in that format.
 
@@ -85,11 +85,11 @@ bean wiring. Gateway now exposes the implemented MVP1 routes, verifies JWTs and 
 Internal endpoints remain blocked at Gateway. Service debug ports are local development
 access only; internal operations additionally require the configured service token.
 
-`pg.clients.<service>.base-url` configures the implemented Ledger/Transfer caller-owned
+`pg.clients.<service>.base-url` configures the implemented Payment/FEP and Ledger/Transfer caller-owned
 clients. Ledger queries Account for ownership/currency; Transfer queries Account and
-consumes Auth OTP authorization before posting to Ledger. Other MVP clients remain
-implementation TODOs. Outbox relay is opt-in via `compose.outbox.yaml`; it enables only
-Ledger and Transfer. ReportStoragePort/S3 remains outside MVP1.
+consumes Auth OTP authorization before posting to Ledger. Payment calls Account/Ledger/FEP; FEP alone calls Mock PG. Other MVP clients remain
+implementation TODOs. Outbox relay is opt-in via `compose.outbox.yaml`; it enables
+Ledger, Transfer and Payment. ReportStoragePort/S3 remains outside MVP1.
 Auth uses the supplied stable Mock-OTP secret. Without configured RSA PEM keys it
 still creates a development JWT key on startup, so restarting Auth requires login again.
 Production key and secret injection remain in the AWS readiness checklist.
@@ -150,3 +150,21 @@ docker buildx build --platform linux/arm64 --load -f infra/docker/Dockerfile \
 Docker references: [multi-stage builds](https://docs.docker.com/build/building/multi-stage/),
 [Dockerfile-specific ignore files](https://docs.docker.com/build/concepts/context/#dockerignore-files),
 [Compose profiles](https://docs.docker.com/compose/how-tos/profiles/).
+
+## MVP2 synchronous payment verification
+
+The current [Payment implementation checklist](../../main-vpc/core/payment/SKELETON.md) supersedes old statements that Payment/FEP/Mock PG are entirely skeletons. PG final result and ledger confirmation are both required before payment/refund/cancellation success. Timeout never triggers another financial request. Automatic result queries remain disabled pending clarification.
+
+```sh
+python3 infra/docker/run-mvp1-e2e.py --suite MVP2 --observability --output /private/tmp/mvp2-result.json
+```
+
+This also runs MVP1 regression, provider faults, reservations, duplicate/out-of-order signed callbacks, three-way reconciliation, and actual metrics/logs/traces/local alerts/Grafana provisioning in a fresh `pg_mvp2_*` project. All published ports are dynamically allocated on localhost; Alloy is filtered to this project. Existing stacks and volumes are preserved. This is functional acceptance, not a throughput/SLO certification.
+
+`init-env.py --upgrade` adds the missing `MOCK_PG_TOKEN` and `PG_WEBHOOK_SECRET_HEX` without replacing existing DB credentials. Fresh stacks create `mock_pg_db`/`mock_pg_app`; existing volumes do not rerun initialization. Before an explicitly requested persistent-stack upgrade, create only that missing DB/role with the existing password (see `init/mvp2-postgres.sql`); do not delete volumes or rerun the all-database bootstrap. That upgrade and customer-stack deployment were not performed in this work.
+
+## MVP3 전송 준비 검사
+
+`AI_PREPARATION_WEALTH_TOKEN`은 `init-env.py`가 생성하는 호출자 전용 비밀이다. AI Gateway는 금융 공통 토큰을 인증에 사용하지 않는다. 새 env 파일을 생성하거나 기존 비밀 관리 절차로 별도 주입해야 하며 미설정은 기본 차단이다. PostgreSQL ai_gateway_db의 Flyway V2는 원문/마스킹본/복원 매핑 없는 감사 테이블을 만든다. 기존 스택에는 이번에 적용하지 않았다.
+
+`python3 infra/docker/run-mvp1-e2e.py --suite MVP3 --observability --output /private/tmp/mvp3-result.json`은 새 프로젝트에서 MVP1/2 회귀와 AI 준비 검사를 함께 실행하고 AI 인터넷 출구를 제거한 상태로 검증한다. 기존 고객 컨테이너/데이터를 재사용하지 않는다. API와 한계는 [AI 구현 체크리스트](../../ai-vpc/ai-gateway/SKELETON.md)를 따른다. 외부 LLM·API 키·AWS/NAT 활성화는 포함하지 않는다.

@@ -32,9 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다.
- * 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다.
- */
+/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다. 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다. */
 @RestController
 @Profile("skeleton")
 public final class PaymentController {
@@ -58,6 +56,8 @@ public final class PaymentController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F01] 모의 결제
      * API 초안: POST /api/v1/payments
@@ -88,11 +88,15 @@ public final class PaymentController {
                                 request.merchantId(),
                                 request.amount(),
                                 request.currency(),
-                                idempotencyKey));
+                                idempotencyKey,
+                                request.sourceAccountId(),
+                                request.destinationAccountId()));
         return new ApprovePaymentResponse(result.paymentId(), result.status());
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F02] 결제 조회
      * API 초안: GET /api/v1/payments/{paymentId}
@@ -118,13 +122,17 @@ public final class PaymentController {
         return new GetPaymentResponse(
                 result.paymentId(),
                 result.orderReference(),
+                result.requestedAmount(),
                 result.approvedAmount(),
                 result.refundedAmount(),
+                result.reservedAmount(),
                 result.currency(),
                 result.status());
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F03] 결제 취소
      * API 초안: POST /api/v1/payments/{paymentId}/cancel
@@ -154,6 +162,8 @@ public final class PaymentController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F04] 환불 요청
      * API 초안: POST /api/v1/payments/{paymentId}/refunds
@@ -189,6 +199,8 @@ public final class PaymentController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F05] 환불 이력
      * API 초안: GET /api/v1/payments/{paymentId}/refunds

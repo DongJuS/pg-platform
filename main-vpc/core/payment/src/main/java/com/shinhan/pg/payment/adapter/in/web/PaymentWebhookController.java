@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다.
- * 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다.
- */
+/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다. 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다. */
 @RestController
 @Profile("skeleton")
 public final class PaymentWebhookController {
@@ -26,6 +24,8 @@ public final class PaymentWebhookController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F06] Mock PG 웹훅 수신
      * API 초안: POST /mock/v1/pg/webhooks
@@ -42,11 +42,18 @@ public final class PaymentWebhookController {
      * 출처: https://app.notion.com/p/3faad9292a4981bebda6ddcf95ec0732
      * </pre>
      */
-    @PostMapping("/mock/v1/pg/webhooks")
+    @PostMapping("/internal/v1/payments/pg/webhooks")
     @ResponseStatus(HttpStatus.OK)
     public void receivePgWebhook(
-            @RequestBody byte[] rawPayload, @RequestHeader("X-PG-Signature") String signature) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
+            @RequestBody byte[] rawPayload,
+            @RequestHeader("X-PG-Signature") String signature,
+            @org.springframework.web.bind.annotation.RequestAttribute(
+                            name = "callerServiceId",
+                            required = false)
+                    String caller) {
+        if (!"fep-adapter".equals(caller))
+            throw new com.shinhan.pg.payment.domain.error.PaymentException(
+                    com.shinhan.pg.payment.domain.error.PaymentErrorCode.FORBIDDEN);
         receivePgWebhookUseCase.receivePgWebhook(
                 new ReceivePgWebhookCommand(UUID.randomUUID(), rawPayload, signature));
     }

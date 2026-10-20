@@ -1,0 +1,1672 @@
+{
+  "started_at_kst": "2026-10-20T21:38:21.016231+09:00",
+  "context": {
+    "directory": "/private/tmp/pg-mvp3-e2e-5mbdca0p",
+    "project": "pg_mvp3_6289f6f7",
+    "image_registry": "sinhan_mvp1_test",
+    "image_tag": "mvp3-c882c246",
+    "services": [
+      "api-gateway",
+      "auth",
+      "account",
+      "ledger",
+      "transfer",
+      "payment",
+      "fep-adapter",
+      "mock-pg",
+      "ai-gateway"
+    ],
+    "account_proxy_workaround": false,
+    "otp_verified": true,
+    "source_working_tree_has_changes": true,
+    "observability": true,
+    "source_sha256": "f4b550a61b06988e0cb09e4f935ea660c90cf817dd029d7736caf58984a377c6",
+    "ai_gateway_internet_egress": false
+  },
+  "preconditions": {
+    "account_proxy_workaround": false,
+    "opening_balance_fixture_only": true,
+    "otp_verified": true,
+    "existing_stack_isolated": true
+  },
+  "amount": "10000",
+  "currency": "KRW",
+  "financial_post_requests": 10,
+  "checks": [
+    {
+      "name": "Gateway health",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "User 1 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 1 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 1 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 registered through Gateway",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "User 2 logged in through Gateway",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Account 2 created with verified JWT",
+      "passed": true,
+      "actual": 201
+    },
+    {
+      "name": "No account proxy workaround is configured",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Newly opened accounts have zero balance",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Auth user profile receives verified Gateway identity",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Another user's balance is forbidden",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Another user's entries are forbidden",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Spoofed user identity is scrubbed",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "LEDGER-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Unknown account remains 404",
+      "passed": true,
+      "actual": {
+        "status": 404,
+        "code": "ACCOUNT-ACCESS-NOT_FOUND"
+      }
+    },
+    {
+      "name": "Missing OTP is rejected before reservation",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Forged OTP is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Invalid JWT signature is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "COMMON-HTTP-401"
+      }
+    },
+    {
+      "name": "Gateway denies internal endpoints",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-HTTP-403"
+      }
+    },
+    {
+      "name": "Initial balance fixture visible through Gateway -> Ledger",
+      "passed": true,
+      "actual": {
+        "source": "100000",
+        "destination": "0"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Single transfer request returns HTTP 200 COMPLETED",
+      "passed": true,
+      "actual": {
+        "status": 200,
+        "response": {
+          "transferId": "d3c116fe-841a-4069-8bbf-afc0279c3e3b",
+          "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e",
+          "status": "COMPLETED"
+        },
+        "response_trace_id": "3303a758d8d5d94d8206b2173492324f"
+      }
+    },
+    {
+      "name": "Exactly one durable completed transfer",
+      "passed": true,
+      "actual": {
+        "id": "d3c116fe-841a-4069-8bbf-afc0279c3e3b",
+        "transaction_id": "fd51226f-355f-4940-9c60-936323e3bc1e",
+        "status": "COMPLETED",
+        "amount": "10000.0000",
+        "currency": "KRW",
+        "from_account_id": "c08468c7-c334-42c9-b6c9-fd015eefcaed",
+        "to_account_id": "9f6cac26-40f0-490f-8ea4-cb72b816f0b7"
+      }
+    },
+    {
+      "name": "Source debited once and destination credited once",
+      "passed": true,
+      "actual": {
+        "source": "90000",
+        "destination": "10000"
+      }
+    },
+    {
+      "name": "Total money conserved",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "One journal for the same transactionId",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+          "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e"
+        }
+      ]
+    },
+    {
+      "name": "Two balanced postings, -10000 and +10000 KRW",
+      "passed": true,
+      "actual": [
+        {
+          "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+          "ledgerAccountId": "9fc8a7cf-040e-4927-bb2f-96cf80f743e9",
+          "amount": "-10000.0000",
+          "currency": "KRW"
+        },
+        {
+          "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+          "ledgerAccountId": "96da6381-f757-47b1-89ea-a4af796e5e81",
+          "amount": "10000.0000",
+          "currency": "KRW"
+        }
+      ]
+    },
+    {
+      "name": "Transfer status API returns the committed result",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 1 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Account 2 transaction history routes to Ledger",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Same request is 409 without another debit",
+      "passed": true,
+      "actual": {
+        "status": 409,
+        "code": "TRANSFER-DUPLICATE-REQUEST"
+      }
+    },
+    {
+      "name": "Duplicate response identifies the original transfer",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Same OTP cannot authorize another transfer",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Another user cannot use an OTP authorization",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Another user cannot debit the source account",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "TRANSFER-ACCOUNT-FORBIDDEN"
+      }
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Insufficient funds is 422 rather than 500",
+      "passed": true,
+      "actual": {
+        "status": 422,
+        "code": "TRANSFER-INSUFFICIENT-FUNDS"
+      }
+    },
+    {
+      "name": "Internal account lookup requires service authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Encoded internal path cannot bypass authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Encoded status PATCH cannot bypass authentication",
+      "passed": true,
+      "actual": {
+        "status": 403,
+        "code": "COMMON-INTERNAL-AUTH"
+      }
+    },
+    {
+      "name": "Authenticated internal status change succeeds",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Suspended account cannot transfer",
+      "passed": true,
+      "actual": {
+        "status": 409,
+        "code": "TRANSFER-ACCOUNT-INACTIVE"
+      }
+    },
+    {
+      "name": "Account status can be restored",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Real Mock-TOTP authorization issued",
+      "passed": true,
+      "actual": 200
+    },
+    {
+      "name": "Expired authorization cannot transfer",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "TRANSFER-OTP-INVALID"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Wrong OTP code is rejected",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "AUTH-4011"
+      }
+    },
+    {
+      "name": "Repeated OTP failures lock the draft with 423",
+      "passed": true,
+      "actual": {
+        "status": 423,
+        "code": "AUTH-4230"
+      }
+    },
+    {
+      "name": "Logout completes",
+      "passed": true,
+      "actual": {
+        "status": 204,
+        "code": null
+      }
+    },
+    {
+      "name": "Logged-out JWT cannot access protected APIs",
+      "passed": true,
+      "actual": {
+        "status": 401,
+        "code": "COMMON-HTTP-401"
+      }
+    },
+    {
+      "name": "Fresh login remains possible after logout",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "Rejected requests never changed either balance",
+      "passed": true,
+      "actual": {
+        "source": "90000",
+        "destination": "10000"
+      }
+    },
+    {
+      "name": "Only success and insufficient-funds requests were reserved",
+      "passed": true,
+      "actual": [
+        {
+          "status": "COMPLETED",
+          "count": 1
+        },
+        {
+          "status": "FAILED",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "Both local Outbox rows were ACKed by Kafka",
+      "passed": true,
+      "actual": {
+        "ledger": [
+          {
+            "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+            "destination": "ledger.posted",
+            "routingKey": "[omitted]",
+            "payload": "{\"eventId\":\"2b0100cc-58af-4fbb-93c6-72d2486705cf\",\"transactionId\":\"fd51226f-355f-4940-9c60-936323e3bc1e\",\"journalId\":\"77b2ce5b-c8ec-457a-89a9-486b37799297\",\"occurredAt\":\"2026-10-20T12:38:22.150735085Z\"}",
+            "publishedAt": "2026-10-20 12:38:23.000000",
+            "attempts": 0
+          }
+        ],
+        "transfer": [
+          {
+            "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+            "destination": "transfer.completed",
+            "routingKey": "[omitted]",
+            "payload": "{\"eventId\":\"2b0100cc-58af-4fbb-93c6-72d2486705cf\",\"transferId\":\"d3c116fe-841a-4069-8bbf-afc0279c3e3b\",\"transactionId\":\"fd51226f-355f-4940-9c60-936323e3bc1e\",\"journalId\":\"77b2ce5b-c8ec-457a-89a9-486b37799297\",\"occurredAt\":\"2026-10-20T12:38:22.160178710Z\"}",
+            "publishedAt": "2026-10-20T12:38:23.014595+00:00",
+            "attempts": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "ledger.posted is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "ledger.posted contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "transfer.completed is readable from the real Kafka broker",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "transfer.completed contains one record in this clean broker",
+      "passed": true,
+      "actual": 1
+    },
+    {
+      "name": "Transfer consumer committed ledger.posted with zero lag",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "REST and event completion leave one completion transition",
+      "passed": true,
+      "actual": [
+        {
+          "previous_status": null,
+          "next_status": "RECEIVED",
+          "reason_code": "REQUEST_RECEIVED"
+        },
+        {
+          "previous_status": "RECEIVED",
+          "next_status": "PROCESSING",
+          "reason_code": "LEDGER_POST_REQUESTED"
+        },
+        {
+          "previous_status": "PROCESSING",
+          "next_status": "COMPLETED",
+          "reason_code": "LEDGER_POSTED"
+        }
+      ]
+    },
+    {
+      "name": "Only one transfer journal exists after all rejection probes",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "ledger exports committed unpublished count",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "ledger exports oldest unpublished age",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "transfer exports committed unpublished count",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "transfer exports oldest unpublished age",
+      "passed": true,
+      "actual": null
+    },
+    {
+      "name": "MVP2 synthetic user registered 0",
+      "passed": true
+    },
+    {
+      "name": "MVP2 synthetic user registered 1",
+      "passed": true
+    },
+    {
+      "name": "Gateway -> Payment -> FEP -> PG -> Ledger completes synchronously",
+      "passed": true
+    },
+    {
+      "name": "Approval debits customer only after confirmed PG and ledger",
+      "passed": true
+    },
+    {
+      "name": "Same approval request returns original without another PG transmission",
+      "passed": true
+    },
+    {
+      "name": "PG received approval mutation once",
+      "passed": true
+    },
+    {
+      "name": "Other user cannot read payment",
+      "passed": true
+    },
+    {
+      "name": "Other user cannot refund payment",
+      "passed": true
+    },
+    {
+      "name": "Partial refund confirms PG and reverse journal before success",
+      "passed": true
+    },
+    {
+      "name": "Partial refund returns original account funds",
+      "passed": true
+    },
+    {
+      "name": "Full cancellation after partial refund is rejected",
+      "passed": true
+    },
+    {
+      "name": "Refund history contains the committed refund",
+      "passed": true
+    },
+    {
+      "name": "Full cancellation waits for PG and reverse journal",
+      "passed": true
+    },
+    {
+      "name": "Full cancellation preserves earlier net payment",
+      "passed": true
+    },
+    {
+      "name": "Concurrent real refund requests cannot exceed approved amount",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario TIMEOUT_AFTER_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "PG response loss returns timeout without false internal approval",
+      "passed": true
+    },
+    {
+      "name": "Timed-out approval remains UNKNOWN",
+      "passed": true
+    },
+    {
+      "name": "Repeating timed-out request never resends PG approval",
+      "passed": true
+    },
+    {
+      "name": "Signed Mock PG -> FEP -> Payment duplicate webhooks converge",
+      "passed": true
+    },
+    {
+      "name": "Webhook confirmation includes successful ledger reflection",
+      "passed": true
+    },
+    {
+      "name": "Duplicate webhook causes one debit",
+      "passed": true
+    },
+    {
+      "name": "Lost response and webhook create one journal",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario PENDING configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "PG pending is not an internal success",
+      "passed": true
+    },
+    {
+      "name": "Final PG callback completes pending operation",
+      "passed": true
+    },
+    {
+      "name": "Older PG PENDING cannot reverse an already completed effect",
+      "passed": true
+    },
+    {
+      "name": "FEP rejects forged original signature",
+      "passed": true
+    },
+    {
+      "name": "Payment callback requires internal authentication",
+      "passed": true
+    },
+    {
+      "name": "Payment independently rejects forged provider signature",
+      "passed": true
+    },
+    {
+      "name": "Mock PG access fails closed without provider token",
+      "passed": true
+    },
+    {
+      "name": "Three-way reconciliation compares Payment PG and actual MariaDB postings",
+      "passed": true
+    },
+    {
+      "name": "PG file amount discrepancy is persisted with its original reference",
+      "passed": true
+    },
+    {
+      "name": "Reconciliation mismatch and local Outbox event commit together",
+      "passed": true
+    },
+    {
+      "name": "Duplicate PG file rows are detected",
+      "passed": true
+    },
+    {
+      "name": "Missing PG file rows are detected",
+      "passed": true
+    },
+    {
+      "name": "Reconciliation business counter is exported for the existing alert rule",
+      "passed": true
+    },
+    {
+      "name": "FEP exports actual provider request latency histogram",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario DECLINE configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "PG final decline never becomes an internal approval",
+      "passed": true
+    },
+    {
+      "name": "PG decline does not move funds",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario PENDING configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Pending refund is not successful and keeps reservation",
+      "passed": true
+    },
+    {
+      "name": "Pending refund reservation is visible in payment query",
+      "passed": true
+    },
+    {
+      "name": "Cancellation conflicts with pending refund",
+      "passed": true
+    },
+    {
+      "name": "Pending reservation counts toward subsequent refund limit",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario TIMEOUT_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Timeout before provider processing remains UNKNOWN",
+      "passed": true
+    },
+    {
+      "name": "Unanswered operation is never sent again",
+      "passed": true
+    },
+    {
+      "name": "No-response operation never debits account",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Provider transport failure 1 is not financial success",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Provider transport failure 2 is not financial success",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Provider transport failure 3 is not financial success",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Provider transport failure 4 is not financial success",
+      "passed": true
+    },
+    {
+      "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+      "passed": true
+    },
+    {
+      "name": "Provider transport failure 5 is not financial success",
+      "passed": true
+    },
+    {
+      "name": "Open circuit refuses a new external financial request",
+      "passed": true
+    },
+    {
+      "name": "Prometheus scrapes Payment FEP and Mock PG",
+      "passed": true
+    },
+    {
+      "name": "Runtime mismatch counter reaches Prometheus",
+      "passed": true
+    },
+    {
+      "name": "Real reconciliation alert reaches local Alertmanager",
+      "passed": true
+    },
+    {
+      "name": "One real payment trace spans Payment FEP PG and Ledger in Tempo",
+      "passed": true
+    },
+    {
+      "name": "Real payment completion logs and trace ID are queryable in Loki",
+      "passed": true
+    },
+    {
+      "name": "Grafana provisions Prometheus Loki and Tempo data sources",
+      "passed": true
+    },
+    {
+      "name": "Grafana provisions platform dashboards",
+      "passed": true
+    },
+    {
+      "name": "Authenticated internal request completes pre-transfer checks",
+      "passed": true
+    },
+    {
+      "name": "All supported PII types are masked and repeated names reuse a token",
+      "passed": true
+    },
+    {
+      "name": "Readiness explicitly reports no external transfer",
+      "passed": true
+    },
+    {
+      "name": "Sensitive response is not cacheable and trace is propagated",
+      "passed": true
+    },
+    {
+      "name": "Real PostgreSQL audit exists before success and uses authenticated identity",
+      "passed": true
+    },
+    {
+      "name": "Audit stores neither original values nor credentials",
+      "passed": true
+    },
+    {
+      "name": "Audit schema has no prompt mapping hash or usage token columns",
+      "passed": true
+    },
+    {
+      "name": "Missing service credentials",
+      "passed": true
+    },
+    {
+      "name": "Wrong service credential",
+      "passed": true
+    },
+    {
+      "name": "Shared financial token cannot impersonate AI caller",
+      "passed": true
+    },
+    {
+      "name": "Caller header cannot be changed with another caller token",
+      "passed": true
+    },
+    {
+      "name": "Authenticated but unauthorized service cannot prepare input",
+      "passed": true
+    },
+    {
+      "name": "Empty input is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Whitespace input is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Oversized prompt is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Unsupported input format is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Missing prompt is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Missing format is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Missing sensitive-value inventory is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Numeric prompt is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Forged caller body field is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Forged masking token is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Hidden control character is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Unknown PII type is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Unsupported media type is rejected safely",
+      "passed": true
+    },
+    {
+      "name": "Malformed JSON is rejected before preparation",
+      "passed": true
+    },
+    {
+      "name": "Duplicate JSON fields is rejected before preparation",
+      "passed": true
+    },
+    {
+      "name": "Oversized HTTP body is rejected before preparation",
+      "passed": true
+    },
+    {
+      "name": "Chunked input cannot bypass the transport size cap",
+      "passed": true
+    },
+    {
+      "name": "Date ordinary amounts and percentages remain usable",
+      "passed": true
+    },
+    {
+      "name": "Adjacent repeated PII uses a consistent token",
+      "passed": true
+    },
+    {
+      "name": "Versioned injection policy blocks input",
+      "passed": true
+    },
+    {
+      "name": "Versioned injection policy blocks input",
+      "passed": true
+    },
+    {
+      "name": "Versioned injection policy blocks input",
+      "passed": true
+    },
+    {
+      "name": "Unclassified residual identifier prevents readiness",
+      "passed": true
+    },
+    {
+      "name": "Concurrent requests have independent request IDs and stable local tokens",
+      "passed": true
+    },
+    {
+      "name": "Actual database write failure returns 503 without a ready response",
+      "passed": true
+    },
+    {
+      "name": "Failed database operation cannot create a ready audit",
+      "passed": true
+    },
+    {
+      "name": "Application logs contain no original PII prompt or credential",
+      "passed": true
+    },
+    {
+      "name": "Existing structured logs include safe preparation decisions",
+      "passed": true
+    },
+    {
+      "name": "AI container has no internet egress network",
+      "passed": true
+    },
+    {
+      "name": "Deferred external inference remains unavailable",
+      "passed": true
+    },
+    {
+      "name": "Preparation decisions use the existing Prometheus endpoint",
+      "passed": true
+    },
+    {
+      "name": "No sensitive values occur in metric labels",
+      "passed": true
+    },
+    {
+      "name": "Existing Prometheus actually scrapes the AI preparation counter",
+      "passed": true
+    }
+  ],
+  "gateway_address": "http://127.0.0.1:55063",
+  "accounts": {
+    "source": "c08468c7-c334-42c9-b6c9-fd015eefcaed",
+    "destination": "9f6cac26-40f0-490f-8ea4-cb72b816f0b7"
+  },
+  "balances_before": {
+    "source": "100000",
+    "destination": "0"
+  },
+  "idempotency_key": "[omitted]",
+  "transfer_api": {
+    "status": 200,
+    "response": {
+      "transferId": "d3c116fe-841a-4069-8bbf-afc0279c3e3b",
+      "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e",
+      "status": "COMPLETED"
+    },
+    "response_trace_id": "3303a758d8d5d94d8206b2173492324f"
+  },
+  "transfer_database": {
+    "id": "d3c116fe-841a-4069-8bbf-afc0279c3e3b",
+    "transaction_id": "fd51226f-355f-4940-9c60-936323e3bc1e",
+    "status": "COMPLETED",
+    "amount": "10000.0000",
+    "currency": "KRW",
+    "from_account_id": "c08468c7-c334-42c9-b6c9-fd015eefcaed",
+    "to_account_id": "9f6cac26-40f0-490f-8ea4-cb72b816f0b7"
+  },
+  "balances_after": {
+    "source": "90000",
+    "destination": "10000"
+  },
+  "journals": [
+    {
+      "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+      "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e"
+    }
+  ],
+  "postings": [
+    {
+      "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+      "ledgerAccountId": "9fc8a7cf-040e-4927-bb2f-96cf80f743e9",
+      "amount": "-10000.0000",
+      "currency": "KRW"
+    },
+    {
+      "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+      "ledgerAccountId": "96da6381-f757-47b1-89ea-a4af796e5e81",
+      "amount": "10000.0000",
+      "currency": "KRW"
+    }
+  ],
+  "outbox": {
+    "ledger": [
+      {
+        "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+        "destination": "ledger.posted",
+        "routingKey": "[omitted]",
+        "payload": "{\"eventId\":\"2b0100cc-58af-4fbb-93c6-72d2486705cf\",\"transactionId\":\"fd51226f-355f-4940-9c60-936323e3bc1e\",\"journalId\":\"77b2ce5b-c8ec-457a-89a9-486b37799297\",\"occurredAt\":\"2026-10-20T12:38:22.150735085Z\"}",
+        "publishedAt": "2026-10-20 12:38:23.000000",
+        "attempts": 0
+      }
+    ],
+    "transfer": [
+      {
+        "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+        "destination": "transfer.completed",
+        "routingKey": "[omitted]",
+        "payload": "{\"eventId\":\"2b0100cc-58af-4fbb-93c6-72d2486705cf\",\"transferId\":\"d3c116fe-841a-4069-8bbf-afc0279c3e3b\",\"transactionId\":\"fd51226f-355f-4940-9c60-936323e3bc1e\",\"journalId\":\"77b2ce5b-c8ec-457a-89a9-486b37799297\",\"occurredAt\":\"2026-10-20T12:38:22.160178710Z\"}",
+        "publishedAt": "2026-10-20T12:38:23.014595+00:00",
+        "attempts": 0
+      }
+    ]
+  },
+  "kafka": {
+    "ledger.posted": {
+      "messages": [
+        {
+          "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+          "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e",
+          "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+          "occurredAt": "2026-10-20T12:38:22.150735085Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "ledger.posted:0:1",
+        "ledger.posted:1:0",
+        "ledger.posted:2:0"
+      ],
+      "record_count": 1
+    },
+    "transfer.completed": {
+      "messages": [
+        {
+          "eventId": "2b0100cc-58af-4fbb-93c6-72d2486705cf",
+          "transferId": "d3c116fe-841a-4069-8bbf-afc0279c3e3b",
+          "transactionId": "fd51226f-355f-4940-9c60-936323e3bc1e",
+          "journalId": "77b2ce5b-c8ec-457a-89a9-486b37799297",
+          "occurredAt": "2026-10-20T12:38:22.160178710Z"
+        }
+      ],
+      "partition_end_offsets": [
+        "transfer.completed:0:1",
+        "transfer.completed:1:0",
+        "transfer.completed:2:0"
+      ],
+      "record_count": 1
+    }
+  },
+  "transfer_consumer_group": [
+    "",
+    "GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                              HOST            CLIENT-ID",
+    "transfer        ledger.posted   1          0               0               0               consumer-transfer-1-cf6d9daa-8d42-4960-9856-6048b51d7062 /172.30.0.17    consumer-transfer-1",
+    "transfer        ledger.posted   0          1               1               0               consumer-transfer-1-cf6d9daa-8d42-4960-9856-6048b51d7062 /172.30.0.17    consumer-transfer-1",
+    "transfer        ledger.posted   2          0               0               0               consumer-transfer-1-cf6d9daa-8d42-4960-9856-6048b51d7062 /172.30.0.17    consumer-transfer-1"
+  ],
+  "state_history": [
+    {
+      "previous_status": null,
+      "next_status": "RECEIVED",
+      "reason_code": "REQUEST_RECEIVED"
+    },
+    {
+      "previous_status": "RECEIVED",
+      "next_status": "PROCESSING",
+      "reason_code": "LEDGER_POST_REQUESTED"
+    },
+    {
+      "previous_status": "PROCESSING",
+      "next_status": "COMPLETED",
+      "reason_code": "LEDGER_POSTED"
+    }
+  ],
+  "passed": true,
+  "finished_at_kst": "2026-10-20T21:38:34.585342+09:00",
+  "mvp2": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "MVP2 synthetic user registered 0",
+        "passed": true
+      },
+      {
+        "name": "MVP2 synthetic user registered 1",
+        "passed": true
+      },
+      {
+        "name": "Gateway -> Payment -> FEP -> PG -> Ledger completes synchronously",
+        "passed": true
+      },
+      {
+        "name": "Approval debits customer only after confirmed PG and ledger",
+        "passed": true
+      },
+      {
+        "name": "Same approval request returns original without another PG transmission",
+        "passed": true
+      },
+      {
+        "name": "PG received approval mutation once",
+        "passed": true
+      },
+      {
+        "name": "Other user cannot read payment",
+        "passed": true
+      },
+      {
+        "name": "Other user cannot refund payment",
+        "passed": true
+      },
+      {
+        "name": "Partial refund confirms PG and reverse journal before success",
+        "passed": true
+      },
+      {
+        "name": "Partial refund returns original account funds",
+        "passed": true
+      },
+      {
+        "name": "Full cancellation after partial refund is rejected",
+        "passed": true
+      },
+      {
+        "name": "Refund history contains the committed refund",
+        "passed": true
+      },
+      {
+        "name": "Full cancellation waits for PG and reverse journal",
+        "passed": true
+      },
+      {
+        "name": "Full cancellation preserves earlier net payment",
+        "passed": true
+      },
+      {
+        "name": "Concurrent real refund requests cannot exceed approved amount",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario TIMEOUT_AFTER_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "PG response loss returns timeout without false internal approval",
+        "passed": true
+      },
+      {
+        "name": "Timed-out approval remains UNKNOWN",
+        "passed": true
+      },
+      {
+        "name": "Repeating timed-out request never resends PG approval",
+        "passed": true
+      },
+      {
+        "name": "Signed Mock PG -> FEP -> Payment duplicate webhooks converge",
+        "passed": true
+      },
+      {
+        "name": "Webhook confirmation includes successful ledger reflection",
+        "passed": true
+      },
+      {
+        "name": "Duplicate webhook causes one debit",
+        "passed": true
+      },
+      {
+        "name": "Lost response and webhook create one journal",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario PENDING configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "PG pending is not an internal success",
+        "passed": true
+      },
+      {
+        "name": "Final PG callback completes pending operation",
+        "passed": true
+      },
+      {
+        "name": "Older PG PENDING cannot reverse an already completed effect",
+        "passed": true
+      },
+      {
+        "name": "FEP rejects forged original signature",
+        "passed": true
+      },
+      {
+        "name": "Payment callback requires internal authentication",
+        "passed": true
+      },
+      {
+        "name": "Payment independently rejects forged provider signature",
+        "passed": true
+      },
+      {
+        "name": "Mock PG access fails closed without provider token",
+        "passed": true
+      },
+      {
+        "name": "Three-way reconciliation compares Payment PG and actual MariaDB postings",
+        "passed": true
+      },
+      {
+        "name": "PG file amount discrepancy is persisted with its original reference",
+        "passed": true
+      },
+      {
+        "name": "Reconciliation mismatch and local Outbox event commit together",
+        "passed": true
+      },
+      {
+        "name": "Duplicate PG file rows are detected",
+        "passed": true
+      },
+      {
+        "name": "Missing PG file rows are detected",
+        "passed": true
+      },
+      {
+        "name": "Reconciliation business counter is exported for the existing alert rule",
+        "passed": true
+      },
+      {
+        "name": "FEP exports actual provider request latency histogram",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario DECLINE configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "PG final decline never becomes an internal approval",
+        "passed": true
+      },
+      {
+        "name": "PG decline does not move funds",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario PENDING configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Pending refund is not successful and keeps reservation",
+        "passed": true
+      },
+      {
+        "name": "Pending refund reservation is visible in payment query",
+        "passed": true
+      },
+      {
+        "name": "Cancellation conflicts with pending refund",
+        "passed": true
+      },
+      {
+        "name": "Pending reservation counts toward subsequent refund limit",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario TIMEOUT_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Timeout before provider processing remains UNKNOWN",
+        "passed": true
+      },
+      {
+        "name": "Unanswered operation is never sent again",
+        "passed": true
+      },
+      {
+        "name": "No-response operation never debits account",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Provider transport failure 1 is not financial success",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Provider transport failure 2 is not financial success",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Provider transport failure 3 is not financial success",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Provider transport failure 4 is not financial success",
+        "passed": true
+      },
+      {
+        "name": "Mock PG scenario ERROR_BEFORE_COMMIT configured with authentication",
+        "passed": true
+      },
+      {
+        "name": "Provider transport failure 5 is not financial success",
+        "passed": true
+      },
+      {
+        "name": "Open circuit refuses a new external financial request",
+        "passed": true
+      },
+      {
+        "name": "Prometheus scrapes Payment FEP and Mock PG",
+        "passed": true
+      },
+      {
+        "name": "Runtime mismatch counter reaches Prometheus",
+        "passed": true
+      },
+      {
+        "name": "Real reconciliation alert reaches local Alertmanager",
+        "passed": true
+      },
+      {
+        "name": "One real payment trace spans Payment FEP PG and Ledger in Tempo",
+        "passed": true
+      },
+      {
+        "name": "Real payment completion logs and trace ID are queryable in Loki",
+        "passed": true
+      },
+      {
+        "name": "Grafana provisions Prometheus Loki and Tempo data sources",
+        "passed": true
+      },
+      {
+        "name": "Grafana provisions platform dashboards",
+        "passed": true
+      }
+    ],
+    "financial_mutations": 27,
+    "opening_funds_fixture_only": true,
+    "trace_ids": [
+      "5b372b4b6cc5442dab2a27f808afa1c4",
+      "30845e4b15f142b2b7f769ed51932763",
+      "52d4e6f24aad48929ce5356b8c2c88e8",
+      "3ae04d236733456cbaa80d2490933b85",
+      "0470c69244f64a15acf82fee9fea1706",
+      "e141e69606e04449aa73929530311b94",
+      "5ecadf242726402eac952b4d773567bd",
+      "1af44eec76d041f0a3b7d189ec8482ff",
+      "cac63bb04bec41f89e5e1ba247f7a268",
+      "6d8a0f4dae0248238ae442643358c3e2",
+      "8ee2ad46a0af4d20a48fc90dec857b94",
+      "20e6c8897e2549919a9c9aaf0f6bbbea",
+      "fd626bcd63b14866ae7c500678f2fdf8",
+      "e7d3fcf6cc034725a70cee636daff775",
+      "17b143d40b124fc19ebeed4bbc228430",
+      "1cc477d815b14a4f8104b82a761ddb65",
+      "c69939e00d5e406fa0ad4355b9f8e663",
+      "24d7fbd10f5f43839befbc269417d0e0"
+    ]
+  },
+  "mvp3": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "Authenticated internal request completes pre-transfer checks",
+        "passed": true
+      },
+      {
+        "name": "All supported PII types are masked and repeated names reuse a token",
+        "passed": true
+      },
+      {
+        "name": "Readiness explicitly reports no external transfer",
+        "passed": true
+      },
+      {
+        "name": "Sensitive response is not cacheable and trace is propagated",
+        "passed": true
+      },
+      {
+        "name": "Real PostgreSQL audit exists before success and uses authenticated identity",
+        "passed": true
+      },
+      {
+        "name": "Audit stores neither original values nor credentials",
+        "passed": true
+      },
+      {
+        "name": "Audit schema has no prompt mapping hash or usage token columns",
+        "passed": true
+      },
+      {
+        "name": "Missing service credentials",
+        "passed": true
+      },
+      {
+        "name": "Wrong service credential",
+        "passed": true
+      },
+      {
+        "name": "Shared financial token cannot impersonate AI caller",
+        "passed": true
+      },
+      {
+        "name": "Caller header cannot be changed with another caller token",
+        "passed": true
+      },
+      {
+        "name": "Authenticated but unauthorized service cannot prepare input",
+        "passed": true
+      },
+      {
+        "name": "Empty input is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Whitespace input is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Oversized prompt is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Unsupported input format is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Missing prompt is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Missing format is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Missing sensitive-value inventory is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Numeric prompt is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Forged caller body field is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Forged masking token is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Hidden control character is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Unknown PII type is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Unsupported media type is rejected safely",
+        "passed": true
+      },
+      {
+        "name": "Malformed JSON is rejected before preparation",
+        "passed": true
+      },
+      {
+        "name": "Duplicate JSON fields is rejected before preparation",
+        "passed": true
+      },
+      {
+        "name": "Oversized HTTP body is rejected before preparation",
+        "passed": true
+      },
+      {
+        "name": "Chunked input cannot bypass the transport size cap",
+        "passed": true
+      },
+      {
+        "name": "Date ordinary amounts and percentages remain usable",
+        "passed": true
+      },
+      {
+        "name": "Adjacent repeated PII uses a consistent token",
+        "passed": true
+      },
+      {
+        "name": "Versioned injection policy blocks input",
+        "passed": true
+      },
+      {
+        "name": "Versioned injection policy blocks input",
+        "passed": true
+      },
+      {
+        "name": "Versioned injection policy blocks input",
+        "passed": true
+      },
+      {
+        "name": "Unclassified residual identifier prevents readiness",
+        "passed": true
+      },
+      {
+        "name": "Concurrent requests have independent request IDs and stable local tokens",
+        "passed": true
+      },
+      {
+        "name": "Actual database write failure returns 503 without a ready response",
+        "passed": true
+      },
+      {
+        "name": "Failed database operation cannot create a ready audit",
+        "passed": true
+      },
+      {
+        "name": "Application logs contain no original PII prompt or credential",
+        "passed": true
+      },
+      {
+        "name": "Existing structured logs include safe preparation decisions",
+        "passed": true
+      },
+      {
+        "name": "AI container has no internet egress network",
+        "passed": true
+      },
+      {
+        "name": "Deferred external inference remains unavailable",
+        "passed": true
+      },
+      {
+        "name": "Preparation decisions use the existing Prometheus endpoint",
+        "passed": true
+      },
+      {
+        "name": "No sensitive values occur in metric labels",
+        "passed": true
+      },
+      {
+        "name": "Existing Prometheus actually scrapes the AI preparation counter",
+        "passed": true
+      }
+    ],
+    "external_llm_calls": 0,
+    "external_llm_zero_evidence": "No LLM client bean or active inference route; AI container attached only to Docker internal networks"
+  },
+  "existing_stack_preserved": true,
+  "images": {
+    "api-gateway": {
+      "image": "sinhan_mvp1_test/api-gateway:mvp3-c882c246",
+      "id": "sha256:e55f51f8d070668099e3d3be6756bbc53acbec61b2eb9f762ed98c68aaf820a2",
+      "architecture": "arm64"
+    },
+    "auth": {
+      "image": "sinhan_mvp1_test/auth:mvp3-c882c246",
+      "id": "sha256:78ccd8b691206c86f9042e64005da092a5de34040cb020dbe74e10c9814cd539",
+      "architecture": "arm64"
+    },
+    "account": {
+      "image": "sinhan_mvp1_test/account:mvp3-c882c246",
+      "id": "sha256:45d332b2e8593789d6d6cb311e9502058fa07c93d3cf35004c7a0a43d0231096",
+      "architecture": "arm64"
+    },
+    "ledger": {
+      "image": "sinhan_mvp1_test/ledger:mvp3-c882c246",
+      "id": "sha256:603cf18d888cbf373011749d3801ad03283406385ea38044c849cb8780ab4782",
+      "architecture": "arm64"
+    },
+    "transfer": {
+      "image": "sinhan_mvp1_test/transfer:mvp3-c882c246",
+      "id": "sha256:a4d9e9c9b2102c3522315f3c5d9b44260524ecf5279f9628739bad84bcf309bf",
+      "architecture": "arm64"
+    },
+    "payment": {
+      "image": "sinhan_mvp1_test/payment:mvp3-c882c246",
+      "id": "sha256:00c47e06dc12b8a7b81d49df723ed400a9aedca1e99094609c46a8db77be0c4a",
+      "architecture": "arm64"
+    },
+    "fep-adapter": {
+      "image": "sinhan_mvp1_test/fep-adapter:mvp3-c882c246",
+      "id": "sha256:5278941b9d04e6cf6756f16cd78ca1519a6d7fa627bb36753209e768f0cfd0b3",
+      "architecture": "arm64"
+    },
+    "mock-pg": {
+      "image": "sinhan_mvp1_test/mock-pg:mvp3-c882c246",
+      "id": "sha256:836671343bc8bb02537db5cd0698d5c547894f5f079df2e2286ff06613e1b46d",
+      "architecture": "arm64"
+    },
+    "ai-gateway": {
+      "image": "sinhan_mvp1_test/ai-gateway:mvp3-c882c246",
+      "id": "sha256:3563d76607ea3af09a93830a5c40e95320ab472f1d61ccd80706c55c471db852",
+      "architecture": "arm64"
+    }
+  },
+  "cleanup_complete": true,
+  "published_evidence_note": "Non-secret synthetic routing/idempotency identifiers and the duplicate Figma file identifier are omitted from this published copy. Check results and source hashes are unchanged; original diagnostics are retained locally."
+}

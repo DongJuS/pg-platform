@@ -1,54 +1,36 @@
 package com.shinhan.pg.aigateway.config;
 
-import com.shinhan.pg.aigateway.adapter.out.inspection.PiiInspectionSkeleton;
-import com.shinhan.pg.aigateway.adapter.out.llm.LlmRestSkeleton;
-import com.shinhan.pg.aigateway.adapter.out.persistence.AiAuditWriteSkeleton;
+import com.shinhan.pg.aigateway.adapter.out.inspection.RuleBasedPiiInspectionAdapter;
 import com.shinhan.pg.aigateway.adapter.out.persistence.AiRequestAuditPersistenceAdapter;
-import com.shinhan.pg.aigateway.application.port.out.AiAuditWritePort;
-import com.shinhan.pg.aigateway.application.port.out.AiRequestAuditRepository;
-import com.shinhan.pg.aigateway.application.port.out.LlmRelayPort;
 import com.shinhan.pg.aigateway.application.port.out.PiiInspectionPort;
 import com.shinhan.pg.aigateway.application.service.AiGatewayApplicationService;
-
+import com.shinhan.pg.aigateway.domain.policy.AiRequestInspectionPolicy;
+import com.shinhan.pg.aigateway.domain.policy.PiiMaskingPolicy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import javax.sql.DataSource;
+import java.time.Clock;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-/** 개발용 의존성 조립. 기본/local/aws에는 업무 스켈레톤 bean을 등록하지 않는다. */
+/** Explicit local implementation profile, matching MVP1/2. No inference/LLM bean is registered. */
 @Configuration(proxyBeanMethods = false)
 @Profile("skeleton")
-@org.springframework.boot.context.properties.EnableConfigurationProperties(
-        LlmEndpointProperties.class)
 public class AiGatewaySkeletonConfiguration {
-    @Bean
-    public PiiInspectionPort piiInspectionPort() {
-        return new PiiInspectionSkeleton();
+    @Bean public PiiInspectionPort piiInspectionPort() { return new RuleBasedPiiInspectionAdapter(); }
+    @Bean public AiRequestAuditPersistenceAdapter aiRequestAuditRepository(DataSource source) {
+        return new AiRequestAuditPersistenceAdapter(source);
     }
-
-    @Bean
-    public LlmRelayPort llmRelayPort(LlmEndpointProperties properties) {
-        return new LlmRestSkeleton(
-                new com.shinhan.pg.aigateway.adapter.out.llm.LlmEndpointPolicy(
-                        properties.allowedHosts()));
-    }
-
-    @Bean
-    public AiAuditWritePort aiAuditWritePort() {
-        return new AiAuditWriteSkeleton();
-    }
-
-    @Bean
-    public AiRequestAuditRepository aiRequestAuditRepository() {
-        return new AiRequestAuditPersistenceAdapter();
-    }
-
-    @Bean
-    public AiGatewayApplicationService aiGatewayApplicationService(
-            PiiInspectionPort piiInspectionPort,
-            LlmRelayPort llmRelayPort,
-            AiAuditWritePort aiAuditWritePort,
-            AiRequestAuditRepository aiRequestAuditRepository) {
-        return new AiGatewayApplicationService(
-                piiInspectionPort, llmRelayPort, aiAuditWritePort, aiRequestAuditRepository);
+    @Bean public AiGatewayApplicationService aiGatewayApplicationService(PiiInspectionPort inspection,
+            AiRequestAuditPersistenceAdapter audits, Environment env) {
+        Set<String> allowed = Arrays.stream(env.getProperty("pg.ai.preparation.allowed-callers", "wealth-report").split(","))
+                .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toUnmodifiableSet());
+        if (allowed.stream().anyMatch(s -> !s.matches("[a-z][a-z0-9-]{0,47}")))
+            throw new IllegalArgumentException("Invalid AI caller configuration");
+        return new AiGatewayApplicationService(new PiiMaskingPolicy(), inspection,
+                new AiRequestInspectionPolicy(), audits, allowed, Clock.systemUTC());
     }
 }

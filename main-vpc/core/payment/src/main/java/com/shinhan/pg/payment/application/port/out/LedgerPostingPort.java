@@ -1,10 +1,15 @@
 package com.shinhan.pg.payment.application.port.out;
 
-import com.shinhan.pg.payment.application.command.ApplyPaymentConfirmationCommand;
+import com.shinhan.pg.payment.domain.model.PaymentDetails;
+import com.shinhan.pg.payment.domain.model.PaymentOperation;
 
+import java.util.Optional;
 import java.util.UUID;
 
-/** 확정된 PG 결과에 대한 원장 반영 위치. 동일 업무 ID를 재사용한다. */
 public interface LedgerPostingPort {
-    UUID postApproval(ApplyPaymentConfirmationCommand command);
+    UUID post(PaymentDetails payment, PaymentOperation operation);
+
+    Optional<UUID> find(UUID operationId);
+
+    com.shinhan.pg.payment.application.readmodel.LedgerAudit audit(UUID operationId);
 }

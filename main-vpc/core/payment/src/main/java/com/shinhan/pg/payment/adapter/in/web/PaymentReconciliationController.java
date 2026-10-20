@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다.
- * 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다.
- */
+/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다. 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다. */
 @RestController
 @Profile("skeleton")
 public final class PaymentReconciliationController {
@@ -38,6 +36,8 @@ public final class PaymentReconciliationController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F08] 대사 실행
      * API 초안: POST /internal/v1/payments/reconciliation-runs
@@ -52,7 +52,7 @@ public final class PaymentReconciliationController {
      * </pre>
      */
     @PostMapping("/internal/v1/payments/reconciliation-runs")
-    @ResponseStatus(HttpStatus.ACCEPTED)
+    @ResponseStatus(HttpStatus.OK)
     public StartReconciliationResponse startReconciliation(
             @RequestAttribute(name = "callerServiceId", required = false) String callerServiceId,
             @RequestBody StartReconciliationRequest request) {
@@ -65,6 +65,8 @@ public final class PaymentReconciliationController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F09] 대사 결과
      * API 초안: GET /internal/v1/payments/reconciliation-runs/{runId}

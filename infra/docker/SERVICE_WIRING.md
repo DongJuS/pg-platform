@@ -1,5 +1,7 @@
 # SERVICE_WIRING — Docker 스택 서비스 간 REST 배선 계약
 
+현재 구현 주의(2026-10-20): 아래 조사 이력의 “client 미소비”, “JWKS 없음” 등은 MVP1 이전 상태다. 현재 Gateway JWT/JWKS·MVP1 client와 Payment→FEP→Mock PG, Payment→Account/Ledger가 실제 구현됐다. 최신 MVP2 경로·인증·완료 조건은 [Payment 체크리스트](../../main-vpc/core/payment/SKELETON.md)를 따른다. 기존 base-url 설정을 재사용했으며 AWS 리소스나 고객 스택을 변경하지 않았다.
+
 Backend ①(api-gateway 라우팅 + JWT/JWKS via auth)과 ②(MVP1 이체 플로우:
 account→ledger→transfer)를 구현할 때 Docker 배선을 다시 조사하지 않도록,
 이 문서가 **조사 완료된 배선 계약**을 고정한다. 모든 내용은
@@ -124,3 +126,7 @@ compose.yaml x-app-environment
 - `infra/docker/config/haproxy.cfg` — dev-access 포워드 완비(38080~38095).
 - `infra/docker/init/kafka-topics.sh` — MVP1 필요 토픽
   (`ledger.posted`, `transfer.completed`) 이미 생성됨.
+
+## MVP3 전송 준비 배선 (2026-10-20)
+
+AI Gateway `POST /internal/v1/ai/preparations`는 기존 ai/data 네트워크, ai_gateway_db, Collector를 사용한다. AI에만 `AI_PREPARATION_WEALTH_TOKEN`을 주입하며 호출자별 인증은 기존 생성 필터의 `pg.internal.require-caller-token=true` opt-in이다. 기본 호출자는 wealth-report이고 금융 공통 토큰은 AI 호출자의 신원을 증명하지 못한다. 보고서 생성/외부 추론 client는 계속 비활성이다. 분리 MVP3 시험은 AI의 ai-egress 연결까지 제거한다. 원문 마스킹·완료 의미·오류·탐지 한계는 [AI 구현 체크리스트](../../ai-vpc/ai-gateway/SKELETON.md)를 따른다.

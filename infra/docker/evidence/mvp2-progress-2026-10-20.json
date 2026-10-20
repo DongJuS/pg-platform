@@ -1,0 +1,215 @@
+{
+  "recorded_at_kst": "2026-10-20T21:09:09.170387+09:00",
+  "base_head": "44d8d3437fa124fb3c71b3b40de945ae5cd37fcc",
+  "complete_mvp2": false,
+  "worktree": "Uncommitted implementation changes on the original main HEAD; preexisting .gitignore edits preserved",
+  "features": {
+    "F01": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F02": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F03": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F04": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F05": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F06": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F07": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F08": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F09": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F10": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F11": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F12": {
+      "status": "implemented_and_locally_verified"
+    },
+    "F13": {
+      "status": "deferred"
+    },
+    "F14": {
+      "status": "implemented_tested_but_default_disabled",
+      "reason": "User timeout instruction may prohibit automatic result query; confirmation is pending",
+      "financial_resubmission": false,
+      "scheduled_recovery": false,
+      "query_recovery_opt_in_tests": [
+        "Provider final result -> initial ledger posting",
+        "Lost ledger response -> journal lookup only",
+        "Missing provider result -> UNKNOWN retained, no ledger posting"
+      ]
+    },
+    "F15": {
+      "status": "implemented_and_locally_verified",
+      "guards": [
+        "unique eventId + canonical payload hash",
+        "operationId-scoped final effect and version",
+        "one PG dispatch",
+        "one ledger posting claim",
+        "monotonic internal state",
+        "completion plus Outbox atomicity"
+      ]
+    },
+    "F16": {
+      "status": "implemented_and_locally_verified",
+      "guards": [
+        "Payment row lock",
+        "confirmed + reserved + requested <= approved",
+        "database amount constraints",
+        "cancel/refund conflicts",
+        "UNKNOWN reservation retained"
+      ]
+    },
+    "F17": {
+      "status": "deferred"
+    }
+  },
+  "sources": {
+    "figma": {
+      "latest_metadata_read": true,
+      "frames": {
+        "19:2": "시스템 아키텍처 구성도",
+        "1:9": "mvp2_결제서비스_SRE",
+        "9:210": "refunds: 누적 <= 승인 금액",
+        "9:220": "Alertmanager",
+        "9:223": "Runbook"
+      },
+      "gaps": [
+        "Approval/refund posting does not define source/destination accounts or timing",
+        "Webhook validation does not define FEP callback ingress/authentication",
+        "EKS and PostgreSQL account/ledger labels conflict with confirmed ECS Fargate and MariaDB; user decisions take priority"
+      ]
+    },
+    "adr": "docs/adr/0001-financial-integration-decisions.md",
+    "mvp1_pr": "https://github.com/DongJuS/pg-platform/pull/3",
+    "mvp1_pr_merged": true,
+    "notion_read": [
+      "3faad9292a4980b9ab78c9e81e9c8ca1",
+      "3faad9292a498039a503fbe07cac6bd1",
+      "3faad9292a4980ae9d70cd13f503cc89",
+      "3faad9292a49801c8deeda524464df1d",
+      "3faad9292a49813bacbef22a4476700a",
+      "3fbad9292a498092bd8af323af928ca0",
+      "3faad9292a4981c9b971efeb78107e6d",
+      "3faad9292a4981bebda6ddcf95ec0732"
+    ],
+    "notion_limitations": "Multi-database query was not executed because of connector entitlement. Search and individual page reads succeeded; exhaustive database enumeration and attached convention documents are not claimed."
+  },
+  "pending_user_decisions": [
+    {
+      "subject": "Automatic result queries after timeout",
+      "status": "awaiting_answer",
+      "financial_retransmission": "prohibited",
+      "runtime_default": "No automatic result query and no scheduled recovery",
+      "options": [
+        "No financial retransmission; allow result query",
+        "No financial retransmission or automatic result query"
+      ]
+    }
+  ],
+  "verification": {
+    "gradle": {
+      "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --no-daemon --offline",
+      "build_success": true,
+      "tasks_executed": 158,
+      "counts": {
+        "tests": 285,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": 99,
+      "real_databases": [
+        "MariaDB",
+        "PostgreSQL"
+      ],
+      "log": "/private/tmp/mvp2-final-build.log"
+    },
+    "operations_api": {
+      "tests": 9,
+      "failures": 0,
+      "log": "/private/tmp/mvp2-final-ops.log"
+    },
+    "prometheus_rules": {
+      "passed": true,
+      "image": "prom/prometheus:v3.5.0",
+      "scenarios": 2,
+      "expression_assertions": 7,
+      "log": "/private/tmp/mvp2-final-alerts.log"
+    },
+    "docker": {
+      "passed": true,
+      "checks": 137,
+      "mvp1_regression_checks": 69,
+      "mvp2_checks": 68,
+      "cleanup_complete": true,
+      "existing_stack_preserved": true,
+      "source_sha256": "e5d51662fecefe58a9adc0cce0aab893ce54f54b73d41f4182eee8d69421f516",
+      "source_matches_current_worktree": true,
+      "evidence": "mvp2-business-2026-10-20.json",
+      "scenarios": [
+        "Gateway -> Payment -> FEP -> Mock PG -> Ledger",
+        "approval, query, refund history, partial refund, full cancellation",
+        "real concurrent refund requests and owner checks",
+        "PG pending and response loss before/after processing",
+        "no financial retransmission after timeout",
+        "signed duplicate and out-of-order webhooks",
+        "internal and provider authentication",
+        "three-way reconciliation clean/amount mismatch/duplicate/missing",
+        "real circuit-open rejection",
+        "real Prometheus scrape and reconciliation alert in Alertmanager",
+        "same real trace across Payment FEP Mock PG and Ledger in Tempo",
+        "real completion logs with matching trace ID in Loki",
+        "Grafana data source/dashboard provisioning"
+      ]
+    },
+    "python_syntax": true,
+    "diff_whitespace": true,
+    "not_performed": [
+      "Customer-stack application deployment",
+      "AWS or paid resources",
+      "Real financial institutions",
+      "Production load/SLO/retention certification",
+      "Automatic result-query activation"
+    ]
+  },
+  "preservation": {
+    "existing_customer_stack_updated": false,
+    "existing_customer_data_or_volumes_deleted": false,
+    "aws_resources_created": false,
+    "real_financial_institutions_called": false
+  },
+  "completion_note": "Confirmed synchronous business flows and local observation acceptance are implemented and verified. F14 query recovery code is tested only with explicit opt-in; default runtime remains disabled pending clarification. F13/F17 remain deferred.",
+  "confirmed_decisions": {
+    "internal_success": "PG final result plus confirmed ledger reflection, for approval/refund/cancellation",
+    "funds": "Customer sourceAccountId -> supplied destinationAccountId; refund/cancellation reverses original accounts",
+    "webhooks": "Mock PG -> FEP raw HMAC validation -> Payment with exact raw bytes/signature and internal authentication; Payment validates again",
+    "collision": "Reject cancellation while refund is pending/unknown; reject refund during cancellation; no full cancellation after partial refund",
+    "mutation_retransmission": "Never automatically resend approval/refund/cancellation after timeout; UNKNOWN and reservations remain",
+    "auto_result_query": "Not confirmed; disabled and unscheduled"
+  },
+  "limitations": [
+    "F13 and F17 remain deferred",
+    "No automatic correction of reconciliation mismatches",
+    "Source services are read separately; no distributed snapshot across current-day live transactions",
+    "A process crash may leave a reconciliation run RUNNING; operational closure is not automated",
+    "Mock PG DB initialization is automatic only for fresh volumes; persistent-stack upgrade was not performed",
+    "Historical skeleton Java comments/unused placeholder ports are not the active runtime contract; the Payment implementation checklist identifies the active paths"
+  ],
+  "published_evidence_note": "Non-secret synthetic routing/idempotency identifiers and the duplicate Figma file identifier are omitted from this published copy. Check results and source hashes are unchanged; original diagnostics are retained locally."
+}

@@ -30,12 +30,20 @@ public final class InternalServiceAuthenticationFilter extends OncePerRequestFil
         String path = org.springframework.web.util.UrlPathHelper.defaultInstance.getPathWithinApplication(request);
         boolean legacyStatus = "PATCH".equals(request.getMethod()) && path.matches("/api/v1/accounts/[^/]+/status");
         if (!path.startsWith("/internal/") && !legacyStatus) { chain.doFilter(request, response); return; }
-        String expected = environment.getProperty("pg.internal.service-token", "");
         String supplied = request.getHeader("X-Internal-Service-Token");
         String caller = request.getHeader("X-Internal-Caller");
-        if (expected.isBlank() || supplied == null || caller == null || caller.isBlank()
+        boolean boundCaller = environment.getProperty("pg.internal.require-caller-token", Boolean.class, false);
+        boolean validCaller = caller != null && caller.matches("[a-z][a-z0-9-]{0,47}");
+        // Opt-in for AI preparation: a caller header is authenticated only with its own credential.
+        // Existing financial services retain their current shared-token contract.
+        String expected = boundCaller
+                ? (validCaller ? environment.getProperty("pg.internal.caller-tokens." + caller, "") : "")
+                : environment.getProperty("pg.internal.service-token", "");
+        boolean ambiguous = boundCaller && (java.util.Collections.list(request.getHeaders("X-Internal-Caller")).size() != 1
+                || java.util.Collections.list(request.getHeaders("X-Internal-Service-Token")).size() != 1);
+        if (ambiguous || expected.isBlank() || supplied == null || caller == null || caller.isBlank()
                 || !MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), supplied.getBytes(StandardCharsets.UTF_8))) {
-            response.setStatus(expected.isBlank() ? 503 : 403);
+            response.setStatus(expected.isBlank() && !boundCaller ? 503 : 403);
             response.setContentType("application/json");
             json.writeValue(response.getWriter(), new ErrorResponse("COMMON-INTERNAL-AUTH", "Internal service authentication required", MDC.get("traceId")));
             return;
