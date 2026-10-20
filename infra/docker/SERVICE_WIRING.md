@@ -130,3 +130,9 @@ compose.yaml x-app-environment
 ## MVP3 전송 준비 배선 (2026-10-20)
 
 AI Gateway `POST /internal/v1/ai/preparations`는 기존 ai/data 네트워크, ai_gateway_db, Collector를 사용한다. AI에만 `AI_PREPARATION_WEALTH_TOKEN`을 주입하며 호출자별 인증은 기존 생성 필터의 `pg.internal.require-caller-token=true` opt-in이다. 기본 호출자는 wealth-report이고 금융 공통 토큰은 AI 호출자의 신원을 증명하지 못한다. 보고서 생성/외부 추론 client는 계속 비활성이다. 분리 MVP3 시험은 AI의 ai-egress 연결까지 제거한다. 원문 마스킹·완료 의미·오류·탐지 한계는 [AI 구현 체크리스트](../../ai-vpc/ai-gateway/SKELETON.md)를 따른다.
+
+## MVP4 개발 보고서 경로 (2026-10-20)
+
+Gateway의 `/api/v1/wealth/reports`와 하위 PDF 경로는 기존 JWT/신원 헤더 제거 뒤 wealth-report로 전달한다. 동기 완료의 Gateway 대기는 100s, 서비스 전체 예산은 최대 90s다. Wealth → Ledger의 `POST /internal/v1/ledger/report-snapshots`는 기존 금융 내부 토큰과 wealth-report 호출자 제한을 적용하고, Ledger → Account로 소유권을 확인한 후 MariaDB의 단일 일관된 읽기를 수행한다. Wealth는 자신의 PostgreSQL에만 snapshot/report/PDF를 쓴다.
+
+기존 compose 고객 스택은 활성화하지 않았다. 기본 후보 산식 플래그는 false이며 실제 inference port는 미설정 실패다. `run-mvp1-e2e.py --suite MVP4`만 새 프로젝트에서 `report-test` 합성 설명·후보 정책·Kafka 소비를 명시적으로 활성화한다. 실제 LLM 호출이나 S3/AWS 검증으로 표현하지 않는다. 준비 client는 별도 구현되어 있으나 생성 조립에는 등록하지 않는다. 상세 체크리스트는 `main-vpc/info/wealth-report/SKELETON.md`를 따른다.
