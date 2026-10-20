@@ -15,6 +15,12 @@ jobs:
       - name: Test local operations REST API contracts
         run: python3 -m unittest discover -s infra/docker -p 'test_ops_api.py' -v
       - run: ./gradlew build -Pintegration=true --no-daemon
+      - name: Verify Outbox alert firing and recovery
+        run: >-
+          docker run --rm --network none --memory 256m
+          --entrypoint /bin/promtool
+          -v "$PWD/infra/observability:/rules:ro" -w /rules
+          prom/prometheus:v3.5.0 test rules prometheus-alerts.test.yml
       - uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: '1.16.6'

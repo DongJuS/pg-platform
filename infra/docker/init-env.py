@@ -17,7 +17,8 @@ if not destination.is_absolute() or destination.resolve().is_relative_to(reposit
 values = {name: secrets.token_hex(24) for name in (
     "POSTGRES_PASSWORD", "MARIADB_ROOT_PASSWORD", "APP_DB_PASSWORD", "GRAFANA_ADMIN_PASSWORD"
 )}
-values.update(INTERNAL_SERVICE_TOKEN=secrets.token_hex(32), AUTH_OTP_SECRET_HEX=secrets.token_hex(32))
+values.update(AI_PREPARATION_WEALTH_TOKEN=secrets.token_hex(32), INTERNAL_SERVICE_TOKEN=secrets.token_hex(32), AUTH_OTP_SECRET_HEX=secrets.token_hex(32),
+              PG_WEBHOOK_SECRET_HEX=secrets.token_hex(32), MOCK_PG_TOKEN=secrets.token_hex(32))
 if args.upgrade:
     if not destination.is_file():
         parser.error("Upgrade requires an existing env file.")

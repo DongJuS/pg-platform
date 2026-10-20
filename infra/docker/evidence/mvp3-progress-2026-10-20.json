@@ -1,0 +1,178 @@
+{
+  "recorded_at_kst": "2026-10-20T21:40:17.331273+09:00",
+  "base_head": "44d8d3437fa124fb3c71b3b40de945ae5cd37fcc",
+  "scope_complete": "MVP3 pre-transfer preparation only",
+  "api": {
+    "method": "POST",
+    "path": "/internal/v1/ai/preparations",
+    "runtime_profile": "skeleton",
+    "readiness": "Configured pre-transfer checks and audit commit completed; no LLM answer or transfer",
+    "external_transfer_performed": false
+  },
+  "implemented": [
+    "Caller-bound service token using existing generated authentication filter; header/body impersonation rejected",
+    "Allowlisted service authorization before input processing; default wealth-report, no shared finance-token fallback",
+    "Strict UTF-8 JSON, required format/prompt/inventory, bounded actual/chunked stream and prompt bytes",
+    "Request-local consistent masking for supported NAME/RRN/ACCOUNT/PHONE/EMAIL/CARD forms and explicit caller hints",
+    "Residual inspection and finite normalized Korean/English injection rules, including original text to prevent masking evasion",
+    "Real PostgreSQL minimal audit with physical row mapper, fixed enum constraints and independently committed insert",
+    "Inspection failures and actual database write errors fail closed; no prompt returned for blocked/error requests",
+    "Existing HTTP tracing/structured logs/Prometheus/Collector configuration reused without sensitive labels",
+    "External LLM/inference clients excluded from active configuration and preparation service dependencies"
+  ],
+  "sources": {
+    "figma": {
+      "access": "MCP call limit reached; current connected Chrome browser used successfully",
+      "frames_read": {
+        "1:15": "mvp3_보안AI게이트웨이",
+        "19:2": "시스템 아키텍처 구성도",
+        "19:621": "VPC(보안 AI 게이트 웨이)",
+        "2:2": "00_전체아키텍처"
+      },
+      "unresolved": "User link 14:2 returned to the unselected 0:1 page; no content attributed to 14:2",
+      "conflicts_and_precedence": [
+        "Architecture report arrow says pseudonymized input; MVP3/detail frames place masking inside Gateway. User requested Gateway pre-transfer masking flow.",
+        "Figma includes test-schema raw retention and masked-body storage labels. User prohibits raw/prompt/mapping persistence; neither is stored.",
+        "All-PostgreSQL and EKS labels do not override confirmed Account/Ledger MariaDB and ECS decisions."
+      ]
+    },
+    "local_read": [
+      "AGENTS.md",
+      "CONTEXT.md",
+      "docs/adr/0001-financial-integration-decisions.md",
+      "docs/adr/0002-mvp2-synchronous-payments.md",
+      "docs/prd/FEATURE_FILE_CHECKLIST.md",
+      "ai-vpc/ai-gateway/SKELETON.md",
+      "main-vpc/core/payment/SKELETON.md",
+      "infra/docker/evidence/mvp2-progress-2026-10-20.json",
+      "infra/docker/README.md",
+      "infra/docker/SERVICE_WIRING.md",
+      "infra/docker/OBSERVABILITY.md",
+      ".github/workflows/build.yml"
+    ],
+    "notion_read": [
+      "3faad9292a4981a2b0d5c94e371b082c",
+      "3faad9292a49813bacbef22a4476700a",
+      "3fbad9292a498092bd8af323af928ca0",
+      "3faad9292a49801c8deeda524464df1d"
+    ],
+    "not_read": "Attached PDFs/unknown blocks, exhaustive planning/REST databases, external AI reviews and GitHub PR content; local current code and prior evidence were inspected directly"
+  },
+  "verification": {
+    "gradle": {
+      "passed": true,
+      "initial_full_rerun": {
+        "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --no-daemon --offline",
+        "tests": 325,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "executed_tasks": 158,
+        "log": "/private/tmp/mvp3-full-build.log"
+      },
+      "final_build": {
+        "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --no-daemon --offline",
+        "counts": {
+          "tests": 326,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "suites": 102,
+        "ai_gateway_tests": 47,
+        "executed_tasks": 6,
+        "up_to_date_tasks": 152,
+        "log": "/private/tmp/mvp3-final-build.log"
+      },
+      "databases": [
+        "PostgreSQL Testcontainers",
+        "MariaDB regression Testcontainers"
+      ],
+      "external_llm_verification": [
+        "Production configuration test registers zero LlmRelayPort and RelayLlmUseCase beans",
+        "Each real-PostgreSQL HTTP integration test verifies zero interactions on a test-only external LLM trap port",
+        "Preparation service has no LLM port or HTTP client dependency"
+      ]
+    },
+    "docker": {
+      "passed": true,
+      "command": "python3 infra/docker/run-mvp1-e2e.py --suite MVP3 --observability --output /private/tmp/mvp3-final-docker-result.json",
+      "checks": 182,
+      "mvp1_checks": 69,
+      "mvp2_checks": 68,
+      "mvp3_checks": 45,
+      "source_sha256": "f4b550a61b06988e0cb09e4f935ea660c90cf817dd029d7736caf58984a377c6",
+      "source_matches_final_worktree": true,
+      "cleanup_complete": true,
+      "existing_customer_stack_preserved": true,
+      "external_llm_calls": 0,
+      "ai_gateway_internet_egress": false,
+      "evidence": "mvp3-business-2026-10-20.json",
+      "log": "/private/tmp/mvp3-final-docker-run.log"
+    },
+    "operations_api": {
+      "passed": true,
+      "tests": 9,
+      "failures": 0,
+      "log": "/private/tmp/mvp3-ops-api.log"
+    },
+    "prometheus_alert_rules": {
+      "passed": true,
+      "scenarios": 2,
+      "expression_assertions": 7,
+      "log": "/private/tmp/mvp3-alert-rules.log"
+    },
+    "python_syntax": true,
+    "not_performed": [
+      "Customer-stack deployment or persistent-volume upgrade",
+      "AWS/NAT activation or paid resources",
+      "External LLM/provider connection or real financial institutions",
+      "Production performance/detection recall certification",
+      "Terraform rerun (no Terraform changes)"
+    ]
+  },
+  "preservation": {
+    "head_unchanged": true,
+    "preexisting_files_removed": [],
+    "preexisting_gitignore_unchanged": true,
+    "existing_mvp2_financial_java_and_sql_untouched": true,
+    "shared_files_extended_without_reset": [
+      "build-logic/src/main/templates/web/InternalServiceAuthenticationFilter.java",
+      "infra/docker/compose.yaml",
+      "infra/docker/init-env.py",
+      "infra/docker/.env.example",
+      "infra/docker/run-mvp1-e2e.py",
+      "infra/docker/verify-mvp1.py",
+      "infra/docker/verify-mvp2.py",
+      "infra/docker/README.md",
+      "infra/docker/SERVICE_WIRING.md",
+      "infra/observability/METRICS.md"
+    ],
+    "mvp2_recovery_default_disabled": true,
+    "customer_data_or_volumes_deleted": false,
+    "git_reset_clean_or_commits": false
+  },
+  "limitations": [
+    "Finite pattern rules and explicit caller inventory; undeclared names/addresses/foreign IDs/unsupported formats or obfuscated/indirect injection may be missed",
+    "Long ordinary identifiers/amounts may be masked or blocked as false positives",
+    "Readiness applies only to versioned supported checks and audit commit; not a universal safety guarantee or externally trusted transfer authorization",
+    "Raw/mapping exist transiently in Java memory; no secure immediate GC erasure guarantee",
+    "Transport/authentication/JSON rejections do not create business audit rows; HTTP metrics remain",
+    "Default/aws business path not enabled; customer-stack deployment not performed"
+  ],
+  "needs_confirmation": [
+    "Figma 14:2 current location",
+    "Production caller inventory, credentials rotation/TLS",
+    "Detection accuracy targets and extended types/formats",
+    "Audit retention/access/deletion operations",
+    "Any future restoration/persistent mapping requirements"
+  ],
+  "out_of_scope": [
+    "External LLM HTTP/API keys/providers",
+    "AI answer/output filtering/retry/failover",
+    "MVP4 report/PDF",
+    "Model token accounting/quotas/policy console/full statistics",
+    "AWS/NAT activation",
+    "MVP1/2 financial policy changes"
+  ]
+}

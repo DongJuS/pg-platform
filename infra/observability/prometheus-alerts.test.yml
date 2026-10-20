@@ -1,0 +1,51 @@
+rule_files:
+  - prometheus-alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: Outbox backlog and age fire after their hold periods
+    interval: 1m
+    input_series:
+      - series: 'pg_outbox_unpublished_events{service="payment"}'
+        values: '501+0x15'
+      - series: 'pg_outbox_oldest_unpublished_age_seconds{service="payment"}'
+        values: '601+0x15'
+      - series: 'pg_outbox_metrics_sample_success{service="payment"}'
+        values: '1+0x15'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="OutboxBacklogHigh",alertstate="firing"}'
+        eval_time: 9m
+        exp_samples: []
+      - expr: 'count(ALERTS{alertname="OutboxBacklogHigh",alertstate="firing"})'
+        eval_time: 12m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: 'count(ALERTS{alertname="OutboxOldestEventStale",alertstate="firing"})'
+        eval_time: 6m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: 'ALERTS{alertname="OutboxMetricsUnavailable",alertstate="firing"}'
+        eval_time: 12m
+        exp_samples: []
+  - name: Database sampling failure alerts and clears on recovery
+    interval: 1m
+    input_series:
+      - series: 'pg_outbox_unpublished_events{service="transfer"}'
+        values: 'NaN NaN NaN NaN 0+0x4'
+      - series: 'pg_outbox_oldest_unpublished_age_seconds{service="transfer"}'
+        values: 'NaN NaN NaN NaN 0+0x4'
+      - series: 'pg_outbox_metrics_sample_success{service="transfer"}'
+        values: '0+0x3 1+0x4'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertname="OutboxMetricsUnavailable",alertstate="firing"})'
+        eval_time: 3m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: 'ALERTS{alertname="OutboxMetricsUnavailable",alertstate="firing"}'
+        eval_time: 5m
+        exp_samples: []
+      - expr: 'ALERTS{alertname=~"OutboxBacklogHigh|OutboxOldestEventStale",alertstate="firing"}'
+        eval_time: 3m
+        exp_samples: []

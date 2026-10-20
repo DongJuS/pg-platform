@@ -318,6 +318,8 @@ services:
         SERVICE_PORT: '8085'
     environment:
       <<: *app-environment
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PG_PROVIDER_WEBHOOK_SECRET_HEX: ${PG_WEBHOOK_SECRET_HEX:-}
       SERVER_PORT: '8085'
       DB_URL: jdbc:postgresql://postgres:5432/payment_db
       DB_USERNAME: payment_app
@@ -423,6 +425,7 @@ services:
         SERVICE_PORT: '8090'
     environment:
       <<: *app-environment
+      AI_PREPARATION_WEALTH_TOKEN: ${AI_PREPARATION_WEALTH_TOKEN:-}
       SERVER_PORT: '8090'
       DB_URL: jdbc:postgresql://postgres:5432/ai_gateway_db
       DB_USERNAME: ai_gateway_app
@@ -444,6 +447,9 @@ services:
         SERVICE_PORT: '8091'
     environment:
       <<: *app-environment
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PG_PROVIDER_WEBHOOK_SECRET_HEX: ${PG_WEBHOOK_SECRET_HEX:-}
+      PG_PROVIDER_TOKEN: ${MOCK_PG_TOKEN:-}
       SERVER_PORT: '8091'
       DB_URL: jdbc:postgresql://postgres:5432/fep_adapter_db
       DB_USERNAME: fep_adapter_app
@@ -465,8 +471,16 @@ services:
         SERVICE_PORT: '8092'
     environment:
       <<: *app-environment
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      PG_PROVIDER_WEBHOOK_SECRET_HEX: ${PG_WEBHOOK_SECRET_HEX:-}
+      PG_PROVIDER_TOKEN: ${MOCK_PG_TOKEN:-}
       SERVER_PORT: '8092'
-    networks: [mock]
+      DB_URL: jdbc:postgresql://postgres:5432/mock_pg_db
+      DB_USERNAME: mock_pg_app
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    networks: [mock, data]
+    depends_on:
+      postgres: {condition: service_healthy}
 
   mock-swift:
     <<: *app

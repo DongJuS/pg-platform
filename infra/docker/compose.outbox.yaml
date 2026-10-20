@@ -28,3 +28,6 @@ services:
   transfer:
     environment:
       OUTBOX_ENABLED: "true"
+  payment:
+    environment:
+      OUTBOX_ENABLED: "true"

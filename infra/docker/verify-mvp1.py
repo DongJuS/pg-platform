@@ -19,7 +19,7 @@ if (ROOT / "result.json").exists():
         raise SystemExit("A financial POST was already issued. Inspect its existing transaction; do not rerun.")
 CONTEXT = json.loads((ROOT / "context.json").read_text())
 PROJECT = CONTEXT["project"]
-if not PROJECT.startswith("pg_mvp1_"):
+if not PROJECT.startswith(("pg_mvp1_", "pg_mvp2_", "pg_mvp3_")):
     raise SystemExit("Refusing to run financial acceptance probes outside an isolated pg_mvp1_* project")
 private_env = dict(line.split("=",1) for line in (ROOT / "local.env").read_text().splitlines() if "=" in line and not line.startswith("#"))
 OTP_SECRET = bytes.fromhex(private_env["AUTH_OTP_SECRET_HEX"])
@@ -285,6 +285,25 @@ try:
     REPORT["state_history"] = histories
     check("REST and event completion leave one completion transition", sum(h["next_status"] == "COMPLETED" for h in histories) == 1, histories)
     check("Only one transfer journal exists after all rejection probes", len(maria_rows("ledger_db", "SELECT JSON_OBJECT('id',id) FROM journals;")) == 1)
+    # MVP2-F12 regression: the real PostgreSQL/MariaDB-backed apps must export the
+    # exact names already used by the alert rules. Scrapes are local to this run.
+    for service, port in [("ledger", "8083"), ("transfer", "8084")]:
+        metrics_url = "http://" + compose("port", "dev-access", port).strip() + "/actuator/prometheus"
+        values = {}
+        deadline = time.monotonic() + 35
+        while time.monotonic() < deadline:
+            with urllib.request.urlopen(metrics_url, timeout=10) as response:
+                lines = response.read().decode().splitlines()
+            for line in lines:
+                if line.startswith("pg_outbox_"):
+                    name, value = line.rsplit(" ", 1)
+                    values[name.split("{", 1)[0]] = float(value)
+            if values.get("pg_outbox_unpublished_events") == 0 and values.get("pg_outbox_oldest_unpublished_age_seconds") == 0:
+                break
+            time.sleep(1)
+        check(service + " exports committed unpublished count", values.get("pg_outbox_unpublished_events") == 0)
+        check(service + " exports oldest unpublished age", values.get("pg_outbox_oldest_unpublished_age_seconds") == 0)
+
     REPORT["passed"] = all(item["passed"] for item in REPORT["checks"])
     REPORT["finished_at_kst"] = datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
     save()

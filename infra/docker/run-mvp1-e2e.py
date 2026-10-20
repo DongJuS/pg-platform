@@ -13,17 +13,23 @@ import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, help="Credential-free result JSON destination")
+parser.add_argument("--suite", choices=["MVP1", "MVP2", "MVP3"], default="MVP1")
+parser.add_argument("--observability", action="store_true", help="Include isolated metrics, logs, traces and local alerts")
 args = parser.parse_args()
 repo = Path(__file__).resolve().parents[2]
-run = Path(tempfile.mkdtemp(prefix="pg-mvp1-e2e-", dir="/private/tmp" if Path("/private/tmp").exists() else None))
-project = "pg_mvp1_" + secrets.token_hex(4)
-tag = "mvp1-" + secrets.token_hex(4)
+run = Path(tempfile.mkdtemp(prefix="pg-" + args.suite.lower() + "-e2e-", dir="/private/tmp" if Path("/private/tmp").exists() else None))
+project = "pg_" + args.suite.lower() + "_" + secrets.token_hex(4)
+tag = args.suite.lower() + "-" + secrets.token_hex(4)
 configuration = run / "compose.json"
 env_file = run / "local.env"
 target_services = ["api-gateway", "auth", "account", "ledger", "transfer"]
+if args.suite in {"MVP2", "MVP3"}:
+    target_services += ["payment", "fep-adapter", "mock-pg"]
+if args.suite == "MVP3":
+    target_services += ["ai-gateway"]
 context = {"directory": str(run), "project": project, "image_registry": "sinhan_mvp1_test",
            "image_tag": tag, "services": target_services, "account_proxy_workaround": False,
-           "otp_verified": True, "source_working_tree_has_changes": True}
+           "otp_verified": True, "source_working_tree_has_changes": True, "observability": args.observability}
 
 def docker(*arguments, log=None, timeout=120):
     command = ["docker", *arguments]
@@ -55,12 +61,16 @@ try:
     subprocess.run([sys.executable, str(repo / "infra/docker/init-env.py"), str(env_file)], check=True, timeout=30)
     with env_file.open("a") as output:
         output.write("IMAGE_REGISTRY=sinhan_mvp1_test\nIMAGE_TAG=" + tag + "\n")
-    raw = docker("compose", "--env-file", str(env_file), "--project-name", project,
-                 "-f", str(repo / "infra/docker/compose.yaml"),
-                 "-f", str(repo / "infra/docker/compose.outbox.yaml"),
-                 "--profile", "apps", "config", "--format", "json")
+    compose_inputs = ["compose", "--env-file", str(env_file), "--project-name", project,
+                      "-f", str(repo / "infra/docker/compose.yaml"),
+                      "-f", str(repo / "infra/docker/compose.outbox.yaml")]
+    if args.observability:
+        compose_inputs += ["-f", str(repo / "infra/docker/compose.observability.yaml")]
+    raw = docker(*compose_inputs, "--profile", "apps", "--profile", "observability", "config", "--format", "json")
     config = json.loads(raw)
     keep = set(target_services) | {"postgres", "mariadb", "redis", "kafka", "kafka-init", "kafka-volume-init", "dev-access", "otel-collector"}
+    if args.observability:
+        keep |= {"prometheus", "grafana", "alertmanager", "tempo", "loki", "alloy"}
     config["services"] = {name: value for name, value in config["services"].items() if name in keep}
     for value in config["services"].values():
         value.pop("profiles", None)
@@ -71,8 +81,30 @@ try:
         assert value["name"].startswith(project + "_"), "Refusing shared resources"
     config["services"]["dev-access"]["ports"] = [
         {"target": port, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"}
-        for port in [8080, 8082]
+        for port in ([8080, 8082, 8083, 8084, 8085, 8091, 8092] if args.suite in {"MVP2", "MVP3"} else [8080, 8082, 8083, 8084])
     ]
+    if args.suite == "MVP3":
+        config["services"]["dev-access"]["ports"].append(
+            {"target": 8090, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"})
+        # Test before the external boundary with no internet network attached to AI Gateway.
+        config["services"]["ai-gateway"]["networks"].pop("ai-egress", None)
+        config["services"]["ai-gateway"]["environment"]["PG_INTERNAL_CALLER_TOKENS_PAYMENT"] = "synthetic-denied-caller-credential"
+        context["ai_gateway_internet_egress"] = False
+    if args.observability:
+        alloy = run / "alloy.alloy"
+        alloy.write_text((repo / "infra/observability/alloy.alloy").read_text().replace("com.docker.compose.project=sinhan_project_docker", "com.docker.compose.project=" + project))
+        for mount in config["services"]["alloy"]["volumes"]:
+            if mount.get("target") == "/etc/alloy/config.alloy":
+                mount["source"] = str(alloy)
+        for service in target_services:
+            config["services"][service]["environment"]["TRACE_SAMPLING_PROBABILITY"] = "1.0"
+        for service, port in {"prometheus":9090,"grafana":3000,"alertmanager":9093,"tempo":3200,"loki":3100}.items():
+            config["services"][service]["ports"] = [{"target":port,"published":"0","host_ip":"127.0.0.1","protocol":"tcp"}]
+            networks = config["services"][service]["networks"]
+            if isinstance(networks, dict):
+                networks["obs-ingress"] = None
+            elif "obs-ingress" not in networks:
+                networks.append("obs-ingress")
     descriptor = os.open(configuration, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w") as output:
         json.dump(config, output)
@@ -88,6 +120,24 @@ try:
     completed = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp1.py"), str(run)], cwd=repo, timeout=300)
     if (run / "result.json").exists():
         result = json.loads((run / "result.json").read_text())
+    if args.suite in {"MVP2", "MVP3"} and completed.returncode == 0:
+        extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp2.py"), str(run)], cwd=repo, timeout=360)
+        if (run / "mvp2-result.json").exists():
+            payment_result = json.loads((run / "mvp2-result.json").read_text())
+            result["mvp2"] = payment_result
+            result["checks"].extend(payment_result["checks"])
+            result["passed"] = result["passed"] and payment_result["passed"] and extra.returncode == 0
+        else:
+            result["passed"] = False
+    if args.suite == "MVP3" and result.get("passed"):
+        extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp3.py"), str(run)], cwd=repo, timeout=300)
+        if (run / "mvp3-result.json").exists():
+            ai_result = json.loads((run / "mvp3-result.json").read_text())
+            result["mvp3"] = ai_result
+            result["checks"].extend(ai_result["checks"])
+            result["passed"] = result["passed"] and ai_result["passed"] and extra.returncode == 0
+        else:
+            result["passed"] = False
     result["existing_stack_preserved"] = before == original_containers()
     result["images"] = {}
     for service in target_services:
