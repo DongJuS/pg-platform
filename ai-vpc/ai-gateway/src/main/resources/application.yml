@@ -3,6 +3,14 @@ spring:
     name: ai-gateway
   config:
     import: classpath:platform-defaults.yml,classpath:platform-infra.yml
+pg:
+  internal:
+    require-caller-token: true
+    caller-tokens:
+      wealth-report: ${AI_PREPARATION_WEALTH_TOKEN:}
+  ai:
+    preparation:
+      allowed-callers: ${AI_PREPARATION_ALLOWED_CALLERS:wealth-report}
 server:
   port: ${SERVER_PORT:8090}
 ---

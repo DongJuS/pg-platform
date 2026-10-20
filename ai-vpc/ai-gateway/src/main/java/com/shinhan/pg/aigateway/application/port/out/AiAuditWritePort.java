@@ -1,8 +1,6 @@
 package com.shinhan.pg.aigateway.application.port.out;
 
-import com.shinhan.pg.aigateway.application.command.RelayLlmCommand;
+import com.shinhan.pg.aigateway.domain.model.AiRequestAudit;
 
-/** 민감 원문을 제외한 중계 감사 기록의 저장 위치. */
-public interface AiAuditWritePort {
-    void record(RelayLlmCommand command);
-}
+/** Returns only after the minimal audit is durably committed. Failure prevents a ready response. */
+public interface AiAuditWritePort { void record(AiRequestAudit audit); }

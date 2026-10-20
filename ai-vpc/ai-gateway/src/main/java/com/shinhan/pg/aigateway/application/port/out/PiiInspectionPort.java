@@ -1,8 +1,9 @@
 package com.shinhan.pg.aigateway.application.port.out;
 
-import com.shinhan.pg.aigateway.application.command.RelayLlmCommand;
+import com.shinhan.pg.aigateway.domain.model.SensitiveValue;
+import java.util.List;
 
-/** 입력/출력 개인정보 탐지·정책 차단 위치. 실제 탐지 모델과 정책은 미구현이다. */
+/** True only if supported PII patterns/hints are absent. Errors must fail closed. */
 public interface PiiInspectionPort {
-    void inspect(RelayLlmCommand command);
+    boolean isClear(String maskedPrompt, List<SensitiveValue> sensitiveValues);
 }
