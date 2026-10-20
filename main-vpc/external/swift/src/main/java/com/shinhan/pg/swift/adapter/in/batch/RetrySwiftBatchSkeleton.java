@@ -4,20 +4,38 @@ import com.shinhan.pg.swift.application.command.RetrySwiftCommand;
 import com.shinhan.pg.swift.application.port.in.RetrySwiftUseCase;
 
 /**
+ *
+ *
  * <pre>
- * [MVP5-F05] 무응답 송금은 같은 UETR로 FEP REST 재전송한다.
- * TODO: 정해진 간격·최대 횟수, UETR 고정, fep_db retries 기록
- * TODO: KafkaListener/cron·payload mapping·ack/DLQ는 최종 계약 후 등록한다. HTTP API가 아니다.
+ * [MVP5-F05] Scheduled recovery queries unresolved stored instructions; explicit operator retry reuses the UETR.
+ * Retry budgets and minimum interval are enforced in both Swift/FEP DB claims.
+ * No automatic financial retransmission is activated.
  * </pre>
  */
 public final class RetrySwiftBatchSkeleton {
     private final RetrySwiftUseCase useCase;
+    private final Runnable recovery;
 
     public RetrySwiftBatchSkeleton(RetrySwiftUseCase useCase) {
+        this(useCase, () -> {});
+    }
+
+    public RetrySwiftBatchSkeleton(RetrySwiftUseCase useCase, Runnable recovery) {
         this.useCase = java.util.Objects.requireNonNull(useCase);
+        this.recovery = java.util.Objects.requireNonNull(recovery);
     }
 
     public void handle(RetrySwiftCommand command) {
         useCase.retrySwift(command);
+    }
+
+    /**
+     * Scheduled recovery queries outcomes. Financial retransmission remains an explicit operator
+     * action.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(
+            fixedDelayString = "${pg.swift.recovery-interval-ms:10000}")
+    public void recover() {
+        recovery.run();
     }
 }

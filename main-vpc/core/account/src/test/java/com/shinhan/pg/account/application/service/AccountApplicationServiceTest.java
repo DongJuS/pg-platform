@@ -53,8 +53,24 @@ class AccountApplicationServiceTest {
                         () ->
                                 service.openAccount(
                                         new OpenAccountCommand(
-                                                UUID.randomUUID(), UUID.randomUUID(), "USD", null)));
+                                                UUID.randomUUID(),
+                                                UUID.randomUUID(),
+                                                "USD",
+                                                null)));
         assertEquals(AccountErrorCode.INVALID_REQUEST, error.errorCode());
+    }
+
+    @Test
+    void confirmedMvp5DevelopmentScopeCanOpenUsdButRejectsOtherCurrencies() {
+        var enabled = new AccountApplicationService(ledgerPort, writePort, repository, true);
+        var command = new OpenAccountCommand(UUID.randomUUID(), UUID.randomUUID(), "USD", "SWIFT");
+        assertEquals("USD", enabled.openAccount(command).currency());
+        assertThrows(
+                ApplicationException.class,
+                () ->
+                        enabled.openAccount(
+                                new OpenAccountCommand(
+                                        UUID.randomUUID(), command.actorUserId(), "EUR", null)));
     }
 
     @Test
@@ -86,13 +102,11 @@ class AccountApplicationServiceTest {
         var owner = UUID.randomUUID();
         for (int i = 0; i < 3; i++) repository.store.add(account(owner));
 
-        var first =
-                service.listAccounts(new ListAccountsCommand(UUID.randomUUID(), owner, 0, 2));
+        var first = service.listAccounts(new ListAccountsCommand(UUID.randomUUID(), owner, 0, 2));
         assertEquals(2, first.accounts().size());
         assertEquals(1, first.nextPage());
 
-        var second =
-                service.listAccounts(new ListAccountsCommand(UUID.randomUUID(), owner, 1, 2));
+        var second = service.listAccounts(new ListAccountsCommand(UUID.randomUUID(), owner, 1, 2));
         assertEquals(1, second.accounts().size());
         assertNull(second.nextPage());
     }
@@ -148,8 +162,7 @@ class AccountApplicationServiceTest {
         var account = account(owner);
         repository.store.add(account);
         var result =
-                service.getAccount(
-                        new GetAccountCommand(UUID.randomUUID(), owner, account.id()));
+                service.getAccount(new GetAccountCommand(UUID.randomUUID(), owner, account.id()));
         assertEquals(account.accountNumber(), result.accountNumber());
         assertEquals(owner, result.ownerId());
     }
@@ -178,7 +191,11 @@ class AccountApplicationServiceTest {
                         () ->
                                 service.changeAccountStatus(
                                         new ChangeAccountStatusCommand(
-                                                UUID.randomUUID(), null, "CLOSED", "사유", account.id())));
+                                                UUID.randomUUID(),
+                                                null,
+                                                "CLOSED",
+                                                "사유",
+                                                account.id())));
         assertEquals(AccountErrorCode.INVALID_STATUS_TRANSITION, error.errorCode());
     }
 
@@ -199,8 +216,7 @@ class AccountApplicationServiceTest {
     }
 
     private static Account account(UUID owner) {
-        return new Account(
-                UUID.randomUUID(), owner, "1234567890123456", "KRW", "별칭", "ACTIVE");
+        return new Account(UUID.randomUUID(), owner, "1234567890123456", "KRW", "별칭", "ACTIVE");
     }
 
     // --- fakes ---

@@ -67,7 +67,10 @@ public class FepAdapterSkeletonConfiguration {
             ClearingInstitutionPort clearingInstitutionPort,
             FepMessageWritePort fepMessageWritePort,
             FepMessageRepository fepMessageRepository,
-            FepTransmissionAttemptRepository fepTransmissionAttemptRepository) {
+            FepTransmissionAttemptRepository fepTransmissionAttemptRepository,
+            org.springframework.beans.factory.ObjectProvider<
+                            com.shinhan.pg.fepadapter.application.service.SwiftFepService>
+                    swift) {
         return new FepAdapterApplicationService(
                 pgInstitutionPort,
                 swiftInstitutionPort,
@@ -75,6 +78,7 @@ public class FepAdapterSkeletonConfiguration {
                 clearingInstitutionPort,
                 fepMessageWritePort,
                 fepMessageRepository,
-                fepTransmissionAttemptRepository);
+                fepTransmissionAttemptRepository,
+                swift.getIfAvailable());
     }
 }

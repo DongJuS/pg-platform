@@ -29,9 +29,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * [CMN-F01] LedgerOutboxStore의 실제 MariaDB 11 위 동작 계약.
- * V1+V2 Flyway 마이그레이션으로 만든 outbox_events에 대해 append/claim/published/retry와
- * claim의 {@code FOR UPDATE SKIP LOCKED} 실동작을 검증한다.
+ * [CMN-F01] LedgerOutboxStore의 실제 MariaDB 11 위 동작 계약. V1+V2 Flyway 마이그레이션으로 만든 outbox_events에 대해
+ * append/claim/published/retry와 claim의 {@code FOR UPDATE SKIP LOCKED} 실동작을 검증한다.
  */
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @Testcontainers
@@ -65,7 +64,7 @@ class LedgerOutboxStoreMariaIT {
                         .locations("classpath:db/migration")
                         .load()
                         .migrate();
-        assertEquals(3, result.migrationsExecuted);
+        assertEquals(4, result.migrationsExecuted);
         jdbc = new JdbcTemplate(source);
     }
 
@@ -75,7 +74,10 @@ class LedgerOutboxStoreMariaIT {
         store = new LedgerOutboxStore(jdbc);
     }
 
-    /** append → claim(임대 획득) → 다른 토큰 claim 미선택(임대 보호) → published(토큰 일치 시만) → retry(임대 해제·attempts 증가) → 재claim. */
+    /**
+     * append → claim(임대 획득) → 다른 토큰 claim 미선택(임대 보호) → published(토큰 일치 시만) → retry(임대 해제·attempts
+     * 증가) → 재claim.
+     */
     @Test
     void appendClaimPublishedRetryLifecycle() {
         var first = record("first");
@@ -111,15 +113,12 @@ class LedgerOutboxStoreMariaIT {
         var reclaimed = store.claim(10, UUID.randomUUID(), Duration.ofMinutes(2));
         assertEquals(1, reclaimed.size());
         assertEquals(second.id(), reclaimed.get(0).id());
-        assertEquals(
-                "second",
-                new String(reclaimed.get(0).payload(), StandardCharsets.UTF_8));
+        assertEquals("second", new String(reclaimed.get(0).payload(), StandardCharsets.UTF_8));
     }
 
     /**
-     * SKIP LOCKED 실동작: 다른 트랜잭션이 FOR UPDATE로 잠근 행은 claim이 건너뛰고(skip),
-     * 잠기지 않은 행만 가져온다. SKIP LOCKED가 무시되면 claim이 innodb_lock_wait_timeout
-     * (기본 50초)까지 블록되므로, 10초 안에 완료되는지도 함께 본다.
+     * SKIP LOCKED 실동작: 다른 트랜잭션이 FOR UPDATE로 잠근 행은 claim이 건너뛰고(skip), 잠기지 않은 행만 가져온다. SKIP LOCKED가
+     * 무시되면 claim이 innodb_lock_wait_timeout (기본 50초)까지 블록되므로, 10초 안에 완료되는지도 함께 본다.
      */
     @Test
     void claimSkipsRowsLockedByAnotherTransaction() throws Exception {
@@ -167,16 +166,12 @@ class LedgerOutboxStoreMariaIT {
 
     private String claimTokenOf(UUID id) {
         return jdbc.queryForObject(
-                "select claim_token from outbox_events where id = ?",
-                String.class,
-                id.toString());
+                "select claim_token from outbox_events where id = ?", String.class, id.toString());
     }
 
     private Object claimedAtOf(UUID id) {
         return jdbc.queryForObject(
-                "select claimed_at from outbox_events where id = ?",
-                Object.class,
-                id.toString());
+                "select claimed_at from outbox_events where id = ?", Object.class, id.toString());
     }
 
     private int attemptsOf(UUID id) {

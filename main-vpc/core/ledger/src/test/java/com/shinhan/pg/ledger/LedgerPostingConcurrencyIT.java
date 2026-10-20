@@ -82,7 +82,7 @@ class LedgerPostingConcurrencyIT {
                         .locations("classpath:db/migration")
                         .load()
                         .migrate();
-        assertEquals(3, result.migrationsExecuted);
+        assertEquals(4, result.migrationsExecuted);
         jdbc = new JdbcTemplate(source);
     }
 

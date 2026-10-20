@@ -5,10 +5,12 @@ import com.shinhan.pg.swift.application.port.in.SubmitSwiftUseCase;
 import com.shinhan.pg.swift.application.result.SubmitSwiftResult;
 
 /**
+ *
+ *
  * <pre>
  * [MVP5-F03] Kafka transfer.outbound 수신 → FEP REST 전송. 주 진입점은 HTTP가 아니다.
- * TODO: MT103 필드 매핑, UETR 부여
- * TODO: KafkaListener/cron·payload mapping·ack/DLQ는 최종 계약 후 등록한다. HTTP API가 아니다.
+ * Stored Transfer UETR and frozen instruction bytes are reused across deliveries.
+ * Listener acknowledges after durable submission processing. Operating poison-event/DLQ policy remains deferred.
  * </pre>
  */
 public final class SubmitSwiftConsumerSkeleton {
@@ -20,5 +22,18 @@ public final class SubmitSwiftConsumerSkeleton {
 
     public SubmitSwiftResult handle(SubmitSwiftCommand command) {
         return useCase.submitSwift(command);
+    }
+
+    @org.springframework.kafka.annotation.KafkaListener(
+            containerFactory = "swiftKafkaFactory",
+            topics = com.shinhan.pg.common.eventcontracts.EventTopics.TRANSFER_OUTBOUND,
+            autoStartup = "${pg.swift.enabled:false}",
+            properties = "auto.offset.reset=earliest")
+    public void outbound(byte[] payload, org.springframework.kafka.support.Acknowledgment ack) {
+        var e =
+                com.shinhan.pg.common.eventcontracts.EventCodec.fromBytes(
+                        payload, com.shinhan.pg.common.eventcontracts.TransferOutboundEvent.class);
+        handle(new SubmitSwiftCommand(e.eventId(), e.transferId(), e.uetr()));
+        ack.acknowledge();
     }
 }

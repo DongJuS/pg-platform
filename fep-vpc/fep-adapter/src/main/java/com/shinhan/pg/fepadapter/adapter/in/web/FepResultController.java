@@ -1,11 +1,77 @@
 package com.shinhan.pg.fepadapter.adapter.in.web;
 
-/** [MVP5-F04,MVP7-F03] 상세 HTTP 계약 미정.
- * TODO API: GET /internal/v1/fep/results, POST /internal/v1/fep/callbacks (경로 후보)
- * TODO 처리: channelCode/messageKey 조회와 기관 결과 수신. QueryInstitutionResult/ReceiveInstitutionResultUseCase에 연결할 인증·최종성·payload를 확정한다.
- * TODO DTO: 요청/결과·상관 ID·단계·오류/timeout·재전송 계약 확정 후 별도 request/response 파일 작성.
- * @RestController/@Mapping은 확정 전 등록하지 않는다. 금융 FEP가 외부 LLM 요청을 중계하지 않는다.
+import com.shinhan.pg.common.commonerror.ErrorType;
+import com.shinhan.pg.common.swiftmessages.SwiftProblem;
+import com.shinhan.pg.fepadapter.application.result.SendSwiftMessageResult;
+import com.shinhan.pg.fepadapter.application.service.SwiftFepService;
+
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * Internal SWIFT result polling, explicit retransmission and authenticated Mock callbacks. Query
+ * does not transmit a payment. Reports are schema validated and correlated before being stored.
  */
+@RestController
+@Profile("skeleton")
+@ConditionalOnProperty(name = "pg.swift.enabled", havingValue = "true")
 public final class FepResultController {
-    private FepResultController() {}
+    private final SwiftFepService service;
+
+    public FepResultController(SwiftFepService service) {
+        this.service = service;
+    }
+
+    @GetMapping("/internal/v1/fep/swift/messages/{uetr}/result")
+    public Reports result(
+            @RequestAttribute("callerServiceId") String caller, @PathVariable String uetr) {
+        authorize(caller, "swift");
+        var reports = service.query(uetr);
+        return new Reports(
+                reports.isEmpty() ? null : reports.get(reports.size() - 1),
+                reports,
+                service.transmissionStatus(uetr));
+    }
+
+    @PostMapping("/internal/v1/fep/swift/messages/{uetr}/retransmissions")
+    public SendSwiftMessageResult resend(
+            @RequestAttribute("callerServiceId") String caller, @PathVariable String uetr) {
+        authorize(caller, "swift");
+        return service.retry(uetr);
+    }
+
+    @PostMapping("/internal/v1/fep/swift/messages/{uetr}/results")
+    public void callback(
+            @RequestAttribute("callerServiceId") String caller,
+            @PathVariable String uetr,
+            @RequestBody Report request) {
+        authorize(caller, "mock-swift");
+        service.callback(uetr, request.pacs002());
+    }
+
+    private static void authorize(String actual, String expected) {
+        if (!expected.equals(actual)) throw new SwiftProblem("FORBIDDEN", ErrorType.FORBIDDEN);
+    }
+
+    public record Reports(String pacs002, List<String> reports, String transmissionStatus) {
+        @Override
+        public String toString() {
+            return "SwiftReports[REDACTED]";
+        }
+    }
+
+    public record Report(String pacs002) {
+        @Override
+        public String toString() {
+            return "SwiftReport[REDACTED]";
+        }
+    }
 }

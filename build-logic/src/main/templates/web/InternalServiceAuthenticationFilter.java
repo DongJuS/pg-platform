@@ -32,12 +32,15 @@ public final class InternalServiceAuthenticationFilter extends OncePerRequestFil
         if (!path.startsWith("/internal/") && !legacyStatus) { chain.doFilter(request, response); return; }
         String supplied = request.getHeader("X-Internal-Service-Token");
         String caller = request.getHeader("X-Internal-Caller");
-        boolean boundCaller = environment.getProperty("pg.internal.require-caller-token", Boolean.class, false);
+        boolean swiftPath = environment.getProperty("pg.swift.enabled", Boolean.class, false)
+                && (path.startsWith("/internal/v1/swift/") || path.startsWith("/internal/v1/fep/swift/")
+                    || path.startsWith("/internal/v1/transfers/overseas/") || path.equals("/internal/v1/ledger/overseas-reservations"));
+        boolean boundCaller = swiftPath || environment.getProperty("pg.internal.require-caller-token", Boolean.class, false);
         boolean validCaller = caller != null && caller.matches("[a-z][a-z0-9-]{0,47}");
         // Opt-in for AI preparation: a caller header is authenticated only with its own credential.
         // Existing financial services retain their current shared-token contract.
         String expected = boundCaller
-                ? (validCaller ? environment.getProperty("pg.internal.caller-tokens." + caller, "") : "")
+                ? (validCaller ? environment.getProperty((swiftPath ? "pg.swift.caller-tokens." : "pg.internal.caller-tokens.") + caller, "") : "")
                 : environment.getProperty("pg.internal.service-token", "");
         boolean ambiguous = boundCaller && (java.util.Collections.list(request.getHeaders("X-Internal-Caller")).size() != 1
                 || java.util.Collections.list(request.getHeaders("X-Internal-Service-Token")).size() != 1);

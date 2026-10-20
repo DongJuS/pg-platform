@@ -3,7 +3,6 @@ package com.shinhan.pg.ledger.application.service;
 import com.shinhan.pg.common.commonerror.ApplicationException;
 import com.shinhan.pg.common.commonerror.ErrorCode;
 import com.shinhan.pg.common.commonerror.ErrorType;
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
 import com.shinhan.pg.ledger.application.command.ApplyInstitutionResultCommand;
 import com.shinhan.pg.ledger.application.command.GetBalanceCommand;
 import com.shinhan.pg.ledger.application.command.ListJournalEntriesCommand;
@@ -34,9 +33,9 @@ import java.util.Currency;
 import java.util.List;
 import java.util.UUID;
 
-/** 기능별 계약과 TODO를 모은 application 구현 자리.
- * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * MVP1-F11~F14는 실구현됐다. 금융 쓰기(분개·잔액·Outbox)의 원자성은 LedgerAtomicWritePort 구현
+/**
+ * 기능별 계약과 TODO를 모은 application 구현 자리. Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB
+ * 트랜잭션 안에서 수행하지 않는다. MVP1-F11~F14는 실구현됐다. 금융 쓰기(분개·잔액·Outbox)의 원자성은 LedgerAtomicWritePort 구현
  * (LedgerAtomicWriteAdapter)의 단일 MariaDB 잠금 트랜잭션이 담당한다.
  */
 public final class LedgerApplicationService
@@ -47,6 +46,7 @@ public final class LedgerApplicationService
                 ListJournalEntriesUseCase {
     /** F12 페이지 크기 계약 미정 — 보수적 기본/상한. TODO[CONTRACT]: 최종 계약 시 조정. */
     private static final int DEFAULT_PAGE_SIZE = 20;
+
     private static final int MAX_PAGE_SIZE = 100;
 
     private final LedgerAtomicWritePort ledgerAtomicWritePort;
@@ -69,6 +69,8 @@ public final class LedgerApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F13] 분개 반영
      * API 초안: POST /internal/v1/ledger/postings
@@ -120,6 +122,8 @@ public final class LedgerApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP5-F06,MVP5-F08] Kafka fep.ack 수신. 확정/역분개는 기존 거래 ID에 대해 중복 없이 처리한다.
      * TODO: ACSC → 확정 분개, RJCT → 역분개로 고객 계좌 전액 반환 / 예외: 중복 응답은 무시
@@ -129,11 +133,14 @@ public final class LedgerApplicationService
      */
     @Override
     public void applyInstitutionResult(ApplyInstitutionResultCommand command) {
-        // TODO: 위 처리 순서를 구현하고 DB/외부 시스템 검증을 추가한다. (MVP5 범위 — 이번 작업 외)
-        throw new FeatureNotImplementedException("MVP5-F06");
+        // The original transfer identity selects the hold; the local lock transaction applies at
+        // most one final effect.
+        ledgerAtomicWritePort.applyInstitutionResultWithPessimisticLocks(command);
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F14] 반영 결과 조회
      * API 초안: GET /internal/v1/ledger/transactions/{transactionId}
@@ -156,7 +163,8 @@ public final class LedgerApplicationService
     @Override
     public QueryJournalResult queryJournal(QueryJournalCommand command) {
         // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다. (서비스 인증 토큰 §5-③ 미정)
-        requireValid(command != null && command.transactionId() != null, "transactionId is required");
+        requireValid(
+                command != null && command.transactionId() != null, "transactionId is required");
         // TODO 2: 재시도·대사용 조회. 미반영이면 TRANSACTION_UNKNOWN → 404.
         var journal =
                 journalRepository
@@ -174,6 +182,8 @@ public final class LedgerApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F11] 잔액 조회
      * API 초안: GET /api/v1/accounts/{accountId}/balances
@@ -205,7 +215,11 @@ public final class LedgerApplicationService
         //   계좌 자체가 없으면 Account 조회의 404를 유지한다.
         var account = ledgerAccountRepository.findByExternalAccountId(command.accountId());
         if (account.isEmpty()) {
-            return new GetBalanceResult(command.accountId(), java.math.BigDecimal.ZERO, verifiedAccount.currency(), Instant.now());
+            return new GetBalanceResult(
+                    command.accountId(),
+                    java.math.BigDecimal.ZERO,
+                    verifiedAccount.currency(),
+                    Instant.now());
         }
         // TODO 3: 조회는 상태를 바꾸지 않는다.
         // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
@@ -217,6 +231,8 @@ public final class LedgerApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F12] 원장 거래내역
      * API 초안: GET /api/v1/accounts/{accountId}/entries
@@ -240,10 +256,11 @@ public final class LedgerApplicationService
         // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다. (소유권은 Account 내부 조회로 확인)
         requireValid(command != null && command.accountId() != null, "accountId is required");
         var verifiedAccount = requireOwnedAccount(command.actorUserId(), command.accountId());
+        requireValid(command.size() == null || command.size() > 0, "size must be positive");
         requireValid(
-                command.size() == null || command.size() > 0, "size must be positive");
-        requireValid(
-                command.from() == null || command.to() == null || !command.from().isAfter(command.to()),
+                command.from() == null
+                        || command.to() == null
+                        || !command.from().isAfter(command.to()),
                 "from must not be after to");
         // 2. F11과 같은 소유권 확인 후 시간 역순 키셋 페이지네이션을 적용한다.
         //   본인 계좌에 분개 이력이 없으면 빈 목록을 반환한다.
@@ -277,10 +294,19 @@ public final class LedgerApplicationService
         return new ListJournalEntriesResult(List.copyOf(rows), nextCursor);
     }
 
-    private com.shinhan.pg.ledger.application.readmodel.AccountAccessSnapshot requireOwnedAccount(UUID actor, UUID accountId) {
-        if (actor == null) throw new ApplicationException(new SimpleErrorCode("LEDGER-UNAUTHORIZED", ErrorType.UNAUTHORIZED, "Authenticated user required"));
+    private com.shinhan.pg.ledger.application.readmodel.AccountAccessSnapshot requireOwnedAccount(
+            UUID actor, UUID accountId) {
+        if (actor == null)
+            throw new ApplicationException(
+                    new SimpleErrorCode(
+                            "LEDGER-UNAUTHORIZED",
+                            ErrorType.UNAUTHORIZED,
+                            "Authenticated user required"));
         var account = accountQueryPort.getAccount(accountId);
-        if (!actor.equals(account.ownerId())) throw new ApplicationException(new SimpleErrorCode("LEDGER-FORBIDDEN", ErrorType.FORBIDDEN, "Not the account owner"));
+        if (!actor.equals(account.ownerId()))
+            throw new ApplicationException(
+                    new SimpleErrorCode(
+                            "LEDGER-FORBIDDEN", ErrorType.FORBIDDEN, "Not the account owner"));
         return account;
     }
 

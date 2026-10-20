@@ -3,6 +3,8 @@ pluginManagement { includeBuild("build-logic") }
 dependencyResolutionManagement { repositories { mavenCentral() } }
 
 rootProject.name = "pg-platform"
+include(":swift-messages")
+project(":swift-messages").projectDir = file("libs/swift-messages")
 include(":api-gateway")
 project(":api-gateway").projectDir = file("main-vpc/channel/api-gateway")
 include(":auth")

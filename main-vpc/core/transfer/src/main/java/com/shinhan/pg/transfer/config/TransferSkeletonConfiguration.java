@@ -1,13 +1,14 @@
 package com.shinhan.pg.transfer.config;
 
+import com.shinhan.pg.common.outbox.OutboxStore;
 import com.shinhan.pg.transfer.adapter.in.batch.RecoverTransferBatchSkeleton;
 import com.shinhan.pg.transfer.adapter.in.kafka.CompleteTransferConsumerSkeleton;
-import com.shinhan.pg.transfer.adapter.out.auth.OtpVerificationRestSkeleton;
 import com.shinhan.pg.transfer.adapter.out.ledger.LedgerClientProperties;
 import com.shinhan.pg.transfer.adapter.out.ledger.LedgerPostingRestAdapter;
 import com.shinhan.pg.transfer.adapter.out.persistence.OverseasTransferDetailsPersistenceAdapter;
 import com.shinhan.pg.transfer.adapter.out.persistence.TransferAtomicWriteAdapter;
 import com.shinhan.pg.transfer.adapter.out.persistence.TransferPersistenceJdbcAdapter;
+import com.shinhan.pg.transfer.adapter.out.persistence.outbox.TransferOutboxStore;
 import com.shinhan.pg.transfer.application.port.in.CompleteTransferUseCase;
 import com.shinhan.pg.transfer.application.port.in.RecoverTransferUseCase;
 import com.shinhan.pg.transfer.application.port.out.LedgerPostingPort;
@@ -16,8 +17,6 @@ import com.shinhan.pg.transfer.application.port.out.OverseasTransferDetailsRepos
 import com.shinhan.pg.transfer.application.port.out.TransferAtomicWritePort;
 import com.shinhan.pg.transfer.application.port.out.TransferQueryPort;
 import com.shinhan.pg.transfer.application.service.TransferApplicationService;
-import com.shinhan.pg.transfer.adapter.out.persistence.outbox.TransferOutboxStore;
-import com.shinhan.pg.common.outbox.OutboxStore;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,8 +26,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 
-/** 개발용 의존성 조립. 기본/local/aws에는 업무 스켈레톤 bean을 등록하지 않는다.
- * WO-A6: F15~F17/F20 실구현 bean으로 연결한다. 기존 스켈레톤 클래스 파일은 유지하되 bean 등록에서는 제외한다.
+/**
+ * 개발용 의존성 조립. 기본/local/aws에는 업무 스켈레톤 bean을 등록하지 않는다. WO-A6: F15~F17/F20 실구현 bean으로 연결한다. 기존 스켈레톤
+ * 클래스 파일은 유지하되 bean 등록에서는 제외한다.
  */
 @Configuration(proxyBeanMethods = false)
 @Profile("skeleton")
@@ -53,7 +53,8 @@ public class TransferSkeletonConfiguration {
     }
 
     @Bean
-    public com.shinhan.pg.transfer.application.port.out.AccountQueryPort accountQueryPort(Environment env) {
+    public com.shinhan.pg.transfer.application.port.out.AccountQueryPort accountQueryPort(
+            Environment env) {
         return new com.shinhan.pg.transfer.adapter.out.account.AccountQueryRestAdapter(env);
     }
 
@@ -79,8 +80,41 @@ public class TransferSkeletonConfiguration {
     }
 
     @Bean
-    public OverseasTransferDetailsRepository overseasTransferDetailsRepository() {
-        return new OverseasTransferDetailsPersistenceAdapter();
+    public com.shinhan.pg.transfer.application.port.out.OverseasTransferStore
+            overseasTransferDetailsRepository(DataSource ds, OutboxStore outbox, Environment env) {
+        return new OverseasTransferDetailsPersistenceAdapter(
+                ds, outbox, env.getProperty("pg.swift.payload-key", ""));
+    }
+
+    @Bean
+    public com.shinhan.pg.transfer.application.service.OverseasTransferService
+            overseasTransferService(
+                    com.shinhan.pg.transfer.application.port.out.OverseasTransferStore store,
+                    com.shinhan.pg.transfer.application.port.out.AccountQueryPort accounts,
+                    OtpVerificationPort otp,
+                    Environment env) {
+        return new com.shinhan.pg.transfer.application.service.OverseasTransferService(
+                env.getProperty("pg.swift.enabled", Boolean.class, false),
+                store,
+                new com.shinhan.pg.transfer.adapter.out.ledger.OverseasLedgerRestAdapter(env),
+                accounts,
+                otp);
+    }
+
+    @Bean
+    public com.shinhan.pg.transfer.application.service.OverseasOperationsService
+            overseasOperationsService(
+                    com.shinhan.pg.transfer.application.port.out.OverseasTransferStore store,
+                    Environment env) {
+        var admins =
+                java.util.Arrays.stream(env.getProperty("pg.swift.admin-user-ids", "").split(","))
+                        .filter(s -> !s.isBlank())
+                        .map(java.util.UUID::fromString)
+                        .collect(java.util.stream.Collectors.toSet());
+        return new com.shinhan.pg.transfer.application.service.OverseasOperationsService(
+                admins,
+                store,
+                new com.shinhan.pg.transfer.adapter.out.swift.SwiftOperationsRestAdapter(env));
     }
 
     @Bean
@@ -91,7 +125,8 @@ public class TransferSkeletonConfiguration {
             TransferPersistenceJdbcAdapter persistence,
             com.shinhan.pg.transfer.adapter.out.persistence.TransferHistoryJdbcAdapter histories,
             OverseasTransferDetailsRepository overseasTransferDetailsRepository,
-            com.shinhan.pg.transfer.application.port.out.AccountQueryPort accountQueryPort) {
+            com.shinhan.pg.transfer.application.port.out.AccountQueryPort accountQueryPort,
+            com.shinhan.pg.transfer.application.service.OverseasTransferService overseas) {
         return new TransferApplicationService(
                 ledgerPostingPort,
                 otpVerificationPort,
@@ -99,7 +134,9 @@ public class TransferSkeletonConfiguration {
                 persistence,
                 histories,
                 overseasTransferDetailsRepository,
-                persistence, accountQueryPort);
+                persistence,
+                accountQueryPort,
+                overseas);
     }
 
     /** ledger.posted 소비 → completeTransfer. REST 완료와 동일한 멱등 경로로 수렴한다. */
@@ -118,8 +155,7 @@ public class TransferSkeletonConfiguration {
         return new RecoverTransferBatchSkeleton(
                 useCase,
                 transferQueryPort,
-                Integer.parseInt(
-                        environment.getProperty("pg.transfer.recover.batch-size", "50")));
+                Integer.parseInt(environment.getProperty("pg.transfer.recover.batch-size", "50")));
     }
 
     @Bean

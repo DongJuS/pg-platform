@@ -31,7 +31,7 @@ class FlywayMigrationIT {
                         .locations("classpath:db/migration")
                         .load()
                         .migrate();
-        assertEquals(2, result.migrationsExecuted);
+        assertEquals(3, result.migrationsExecuted);
 
         var jdbc = new JdbcTemplate(source);
         var tables =
@@ -44,7 +44,6 @@ class FlywayMigrationIT {
                 "insert into outbox_events (id, event_id, destination, routing_key, payload)"
                         + " values ('00000000-0000-0000-0000-000000000001',"
                         + " '00000000-0000-0000-0000-000000000002', 'dest', 'key', 'x'::bytea)");
-        assertTrue(
-                jdbc.queryForObject("select count(*) from outbox_events", Long.class) == 1L);
+        assertTrue(jdbc.queryForObject("select count(*) from outbox_events", Long.class) == 1L);
     }
 }

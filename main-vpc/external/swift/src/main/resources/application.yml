@@ -3,6 +3,9 @@ spring:
     name: swift
   config:
     import: classpath:platform-defaults.yml,classpath:platform-infra.yml
+  kafka:
+    consumer:
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 server:
   port: ${SERVER_PORT:8087}
 ---
