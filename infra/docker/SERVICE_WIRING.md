@@ -136,3 +136,9 @@ AI Gateway `POST /internal/v1/ai/preparations`는 기존 ai/data 네트워크, a
 Gateway의 `/api/v1/wealth/reports`와 하위 PDF 경로는 기존 JWT/신원 헤더 제거 뒤 wealth-report로 전달한다. 동기 완료의 Gateway 대기는 100s, 서비스 전체 예산은 최대 90s다. Wealth → Ledger의 `POST /internal/v1/ledger/report-snapshots`는 기존 금융 내부 토큰과 wealth-report 호출자 제한을 적용하고, Ledger → Account로 소유권을 확인한 후 MariaDB의 단일 일관된 읽기를 수행한다. Wealth는 자신의 PostgreSQL에만 snapshot/report/PDF를 쓴다.
 
 기존 compose 고객 스택은 활성화하지 않았다. 기본 후보 산식 플래그는 false이며 실제 inference port는 미설정 실패다. `run-mvp1-e2e.py --suite MVP4`만 새 프로젝트에서 `report-test` 합성 설명·후보 정책·Kafka 소비를 명시적으로 활성화한다. 실제 LLM 호출이나 S3/AWS 검증으로 표현하지 않는다. 준비 client는 별도 구현되어 있으나 생성 조립에는 등록하지 않는다. 상세 체크리스트는 `main-vpc/info/wealth-report/SKELETON.md`를 따른다.
+
+## MVP5 개발 SWIFT 배선
+
+기존 `pg.clients.transfer/swift/ledger/fep-adapter/mock-swift.base-url`을 재사용한다. 신규 SWIFT 내부 경로는 `pg.swift.caller-tokens.<caller>`로 호출자를 인증하고 기존 PG 경로의 금융 공통 토큰 계약은 보존한다. Swift의 외부 client는 FEP만 호출하고 FEP의 새 기관 adapter는 localhost/Mock SWIFT만 허용한다. `ledger.overseas-applied` 토픽을 추가했으며 토픽 생성과 실제 소비 계약을 구분한다.
+
+`run-mvp1-e2e.py --suite MVP5`만 새 격리 프로젝트에서 `swift-test`·USD 계좌·SWIFT Outbox 및 2초 간격 재전송 시험 옵션을 활성화한다. 운영 재전송 기본 false이며 기본 compose 고객 스택은 활성화하지 않았다. 원문 로그는 console/중앙 로그와 분리한 private sink, 관리자 조회·일반 본인 마스킹, 48시간 보존을 적용한다. [MVP5 계약·체크리스트](../../main-vpc/external/swift/SKELETON.md)를 따른다.

@@ -1,0 +1,256 @@
+{
+  "recorded_at_kst": "2026-10-20T23:47:32.004534+09:00",
+  "base_head": "d4598f760bd24583903ccd122f858bff1bf45f06",
+  "branch": "main",
+  "scope": "MVP5 development USD/no-FX/zero-fee remittance; local Mock institution only; production activation held",
+  "implemented": [
+    "Gateway identity, source-owned Account authorization, real Auth OTP consumption and input/idempotency validation",
+    "Development-only USD Account opening; original default KRW scope preserved",
+    "Transfer PostgreSQL intent, stable UETR, fenced reservation recovery and atomic transfer.outbound Outbox",
+    "Real MariaDB per-remittance holding account, ordered locks, atomic journal/balance/reservation/outbox and exactly-once final/reversal effect",
+    "Swift actual Kafka outbound consumer, MT103 block-4 subset, frozen pacs.008 and complete published ISO XSD validation",
+    "Swift internal REST to FEP only; FEP durable receipts, attempts, report history and local Mock-only provider",
+    "Correlated pacs.002, separate intermediate/final/unknown/review states, duplicate/out-of-order/conflicting report handling",
+    "Actual fep.ack and ledger.overseas-applied contracts/consumers plus final Transfer completion Outbox",
+    "Separate administrator query/retransmission APIs; retransmission default off, same UETR and bytes with interval/attempt checks",
+    "Administrator raw message/recipient audit lookup and separated raw private logs; ordinary owner masked views; 48-hour retention",
+    "AES-256-GCM envelopes with record AAD, bounded XML, XXE/external schema denial and fixed safe errors",
+    "Durable Mock atomic file replacement/locking/flush and UETR effect deduplication through process restarts",
+    "Fresh Kafka group replay, byte deserializers, no silent financial skip after transient retry exhaustion",
+    "Bounded Gateway DNS cache to survive actual Docker service IP changes on concurrent restart"
+  ],
+  "confirmed_user_decisions": {
+    "currency": "USD, 2 decimal places, no FX, zero fee",
+    "ledger": "Source to per-transfer holding account; ACSC to development settlement account; RJCT full source reversal",
+    "finality": "ACSC external success, RJCT rejection, supported other known statuses processing, unknown/conflict REVIEW; internal completion only after Ledger evidence",
+    "recovery": "Executable administrator query and gated retransmission APIs; development Mock retransmission tested",
+    "privacy": "Raw original messages/recipients included in private logs/audits/admin lookup; ordinary users own masked history; private retention 48h",
+    "f07": "Latest user instruction to add raw lookup/roles supersedes initial hold for the development admin API",
+    "operating_activation": "Deferred"
+  },
+  "default_gates": {
+    "swift_enabled": false,
+    "required_profile": "swift-test; rejects aws/prod/production",
+    "retransmit_enabled": false,
+    "maximum_sends_including_initial": 3,
+    "minimum_retransmit_seconds": 30,
+    "isolated_test_interval_seconds": 2,
+    "automatic_financial_retransmission": false,
+    "query_interval_seconds": 10,
+    "send_lease_seconds": 30,
+    "administrator_source": "Trusted server-side UUID allowlist; user role headers cannot elevate access",
+    "new_swift_internal_auth": "Per-caller dedicated tokens, including a separate swift-operations credential",
+    "private_data_retention_hours": 48,
+    "payload_key_fallback": null,
+    "mvp2_automatic_result_query": "Existing disabled default preserved",
+    "real_bank_or_swift_transport": false,
+    "mvp4_real_inference": "Still TEST_DOUBLE in isolated report acceptance"
+  },
+  "design": {
+    "figma_access": "MCP Starter limit; current connected Chrome used successfully",
+    "frames_read": {
+      "19:2": "시스템 아키텍처 구성도",
+      "2:2": "00_전체아키텍처",
+      "32:14": "송신·재전송 스케줄러 plus surrounding SWIFT parser/FEP/pacs.002/fep.ack region",
+      "24:42": "Transfer–Ledger synchronous REST",
+      "29:2": "자산관리 보고서 and Kafka snapshot consumer"
+    },
+    "differences": [
+      "Diagram retry label does not specify query vs send, interval or attempt budget; explicit development policy is separate",
+      "Confirmed ADR Ledger ledger.posted / Transfer transfer.completed overrides stale Ledger transfer.completed diagram",
+      "Confirmed MariaDB Account/Ledger and DB idempotency override broad PostgreSQL/Redis diagram labels",
+      "No certified FIN/CBPR+/bank support; supported source sender remains explicitly SYNTHETIC SENDER",
+      "Initial F07 hold superseded only for requested development admin/raw view and roles"
+    ],
+    "notion_pages_read": [
+      "3faad9292a49813bacbef22a4476700a",
+      "3fbad9292a498092bd8af323af928ca0"
+    ],
+    "needs_confirmation": [
+      "Notion PDF/unknown blocks and external AI reviews not read",
+      "Real bank market practice/BAH/correspondent routing/sanctions and live sender identity",
+      "Operating SLO, poison-event quarantine/DLQ, real administrator provisioning and deployment controls"
+    ]
+  },
+  "verification": {
+    "java_current_reports": {
+      "tests": 410,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "java_module_tests": {
+      "mock-pg": 2,
+      "mock-clearing": 1,
+      "mock-kofiu": 1,
+      "mock-swift": 1,
+      "ai-gateway": 47,
+      "outbox": 11,
+      "swift-messages": 13,
+      "event-contracts": 7,
+      "arch-rules": 6,
+      "common-money": 2,
+      "swift": 26,
+      "aml": 8,
+      "wealth-report": 31,
+      "api-gateway": 29,
+      "ledger": 50,
+      "settlement": 8,
+      "auth": 41,
+      "payment": 29,
+      "transfer": 53,
+      "account": 33,
+      "fep-adapter": 11
+    },
+    "java_command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --offline --no-daemon",
+    "java_log": "/private/tmp/mvp5-build-final.log",
+    "java_passed": true,
+    "docker": {
+      "passed": true,
+      "checks": 271,
+      "subtotals": {
+        "MVP2": 61,
+        "MVP3": 44,
+        "MVP4": 39,
+        "MVP5": 58,
+        "MVP1": 69
+      },
+      "regressions_skipped": false,
+      "evidence": "infra/docker/evidence/mvp5-business-2026-10-20.json",
+      "source_sha256": "7ab3439018df3725753f7c4c02551f6c277c9947497f33e4d0b23e6e70e930f9",
+      "source_matches_current": true,
+      "existing_stack_preserved": true,
+      "cleanup_complete": true,
+      "private_test_artifacts_removed": true,
+      "log": "/private/tmp/mvp5-docker-final.log"
+    },
+    "operations_api": {
+      "tests": 9,
+      "passed": true,
+      "log": "/private/tmp/mvp5-ops-tests.log"
+    },
+    "actual_faults": [
+      "Actual Ledger upstream HTTP 200 after MariaDB commit; disposable proxy disconnects downstream TCP response, Transfer persists UNKNOWN, restarts and recovers with no second debit/hold",
+      "Mock SWIFT persists financial outcome before response read timeout; result query completes the same UETR without resending",
+      "Real containers restarted with concurrent service IP changes; Gateway re-resolves DNS and durable service state converges",
+      "Same-UETR explicit retransmission has two Mock deliveries and one Mock financial effect, one hold and one final journal",
+      "Repeated, intermediate, delayed, contradictory final and mutated report identities are deduplicated or sent to REVIEW without a third journal",
+      "FEP actual HTTP rejects schema errors, XXE and changed valid XML with the same UETR",
+      "Raw admin/private log visibility, masked ordinary view, forged admin credential/role/owner denial and expiry enforced"
+    ],
+    "additional_fixtures": [
+      "Synthetic opening funds only in fresh service-owned test databases",
+      "Explicit seeded post-hold UNKNOWN checkpoint is separately tested in addition to actual response disconnection",
+      "Private expiry timestamps advanced in synthetic rows; no claim of waiting 48 wall-clock hours"
+    ],
+    "kafka_regression": {
+      "red": "/private/tmp/mvp5-kafka-repro-red.log",
+      "green": "/private/tmp/mvp5-kafka-repro-green.log",
+      "cause": "Fresh group default latest skipped pre-existing events; actual offset=1 start observed; real broker late-start test failed before earliest default and passed after"
+    },
+    "actual_database": "PostgreSQL/MariaDB Testcontainers and isolated Docker databases; no H2",
+    "mock_only": [
+      "Institution acceptance/settlement/rejection/status and financial-effect counters are local Mock behavior",
+      "MVP4 explanations remain TEST_DOUBLE; no external LLM called"
+    ],
+    "schema_sources": {
+      "official_catalogue": "https://www.iso20022.org/catalogue-messages/iso-20022-messages-archive?search=pacs.008",
+      "official_downloads": {
+        "pacs.008.001.08": "https://www.iso20022.org/message/14231/download",
+        "pacs.002.001.10": "https://www.iso20022.org/message/14061/download"
+      },
+      "official_download_result": "HTTP 403 in this environment; unmodified generated ISO schemas retrieved from public Moov mirror",
+      "files": [
+        {
+          "name": "pacs.002.001.10.xsd",
+          "source": "https://raw.githubusercontent.com/moov-io/fedwire20022/master/xsd/iso/pacs.002.001.10.xsd",
+          "sha256": "d14da6304db5178b1afc7d8ed6cc6073e6e1a143fc79d9ba66d3246d4a654e90",
+          "bytes": 58000
+        },
+        {
+          "name": "pacs.008.001.08.xsd",
+          "source": "https://raw.githubusercontent.com/moov-io/fedwire20022/master/xsd/iso/pacs.008.001.08.xsd",
+          "sha256": "cf048155f70cacd03f1f1dfadf66cba8752be93c249c267351782fd6adb023f7",
+          "bytes": 58040
+        }
+      ],
+      "compatibility": "Complete ISO XSD structural validation only; no SWIFT FIN/CBPR+/network or institution certification"
+    },
+    "aws_resources_created": false,
+    "nat_enabled": false,
+    "live_bank_or_llm_calls": 0
+  },
+  "failures_corrected": [
+    "Expected Flyway migration counts updated for real new service schemas",
+    "Existing KRW-only Account scope extended only under explicit USD development gate",
+    "Overseas skeleton actor request attribute replaced with actual Gateway verified header contract and HTTP regression",
+    "Swift/Ledger default String deserialization corrected to actual byte Outbox wire and real broker regression",
+    "Fresh Kafka group skipped existing events; earliest default and no silent financial skip configured",
+    "Abandoned FEP SENDING lease exposed as transmission UNKNOWN separately from institution outcome",
+    "Gateway cached old container IP after restart; bounded DNS TTL restores logical service routing",
+    "Retry acceptance test now waits for actual asynchronous initial-send outcome and minimum interval",
+    "Disposable Ledger response-loss proxy correctly preserves chunked Spring request bodies"
+  ],
+  "remaining_dependencies": [
+    "Production activation deliberately held; no real bank/SWIFT transport or institution certification",
+    "Real sender identity/address and market-practice subset; live FX/rates/fees/additional currencies outside agreed scope",
+    "Operating load/SLO, finite poison-event quarantine/DLQ and administrative provisioning/retention deployment controls",
+    "Original MVP3/MVP4 real LLM, operating S3 and approved report-metric policy remain deferred"
+  ],
+  "preservation": {
+    "preexisting_changes": [
+      ".gitignore",
+      "build-logic/.kotlin/"
+    ],
+    "customer_containers_preserved": true,
+    "customer_volumes_not_deleted": true,
+    "committed": false,
+    "pull_request_created": false,
+    "merged": false,
+    "deployed": false
+  },
+  "infra_sha256": {
+    "infra/docker/run-mvp1-e2e.py": "5286128fbe7632a4c5ab1595f1b9ea55cd9396e591b77f73c91b3e77fc57ff26",
+    "infra/docker/verify-mvp1.py": "90444fa324150188b703976312ced56608868db0afba2778f511e3c39e9a2b43",
+    "infra/docker/verify-mvp2.py": "82cdca3a80289fe5dc7eada42fa8f23689f62e8bc2fa065b2e033ccc625164db",
+    "infra/docker/verify-mvp3.py": "72861bef0a9e74b3b497e15603acd2dd5893c413b6b3a08b1f763c740d856ac4",
+    "infra/docker/verify-mvp4.py": "965fd42e4641bf1631c90b38e67332b626038575ccaee81890a35edc06728f14",
+    "infra/docker/verify-mvp5.py": "8c1bfbf8d0bf36054895252b21e6dd8ea78f50ab5279071b831e1a1dbb0d15c7",
+    "infra/docker/swift-ledger-loss-proxy.py": "0e86d61789b33c9b5238870faecb58da6c5c64987c77a172e8d445ea09586e8b",
+    "infra/docker/compose.yaml": "629391d66de6034ec7c28633edd379331a6a5a6d06453269a64a4d939ce043a7",
+    "infra/docker/init/kafka-topics.sh": "113cf0074c2fcea6546cf5c899dc49e086f31eb5bf5ea099b57de16cb675302b"
+  },
+  "pr_preparation": {
+    "prepared_at_kst": "2026-10-21T07:03:26.699591+09:00",
+    "branch": "codex/mvp5-swift-remittance",
+    "committed_feature": "8bb2b80344d76ad245dd9d46a7e6cab769125bad",
+    "committed_recovery": "a4d06312db38d344a46d27db69a1371e16bbfa8a",
+    "committed_docker": "5685a1a82379eea4d16b6ab444e041d7f10b8c5a",
+    "fresh_java_verification": {
+      "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --no-daemon --offline",
+      "counts": {
+        "tests": 410,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "passed": true,
+      "log": "/private/tmp/mvp5-pr-build-2026-10-21.log"
+    },
+    "fresh_ops_verification": {
+      "tests": 9,
+      "passed": true,
+      "log": "/private/tmp/mvp5-pr-ops-2026-10-21.log"
+    },
+    "docker_evidence": "2026-10-20 isolated full suite retained; executable source hash unchanged and rechecked 2026-10-21",
+    "current_source_sha256": "7ab3439018df3725753f7c4c02551f6c277c9947497f33e4d0b23e6e70e930f9",
+    "vendor_schemas": "Git attributes preserve original XSD CRLF bytes and recorded SHA-256",
+    "public_evidence_redactions": {
+      "field": "images.*.image",
+      "reason": "Generated ephemeral image tag entropy matched local generic-api-key detector; raw refs omitted, exact image ids and test assertions preserved",
+      "assertion_results_changed": false
+    },
+    "author": "Existing ddong author name; project contributor email passed per command; stored Git author config unchanged",
+    "local_checks": "Staged Gitleaks, UTF-8, whitespace, no wildcard imports, Python/Shell/JSON syntax and Conventional Commit hooks"
+  }
+}
