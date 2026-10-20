@@ -1,6 +1,9 @@
 package com.shinhan.pg.wealthreport.application.port.out;
 
-/** AI Security Gateway에 내부 REST로 설명 초안을 요청한다. 수치는 Java에서 확정한다. */
+import com.shinhan.pg.wealthreport.domain.model.FinancialMetrics;
+import com.shinhan.pg.wealthreport.domain.model.ReportDraft;
+
+/** Inference+response inspection required. Preparation readiness is never a ReportDraft. */
 public interface AiReportDraftPort {
-    String requestDraft(String pseudonymizedData);
+    ReportDraft requestDraft(FinancialMetrics metrics);
 }

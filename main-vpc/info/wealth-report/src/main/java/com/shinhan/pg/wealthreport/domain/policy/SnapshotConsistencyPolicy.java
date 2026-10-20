@@ -1,18 +1,41 @@
 package com.shinhan.pg.wealthreport.domain.policy;
 
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+import com.shinhan.pg.wealthreport.domain.error.ReportException;
+import com.shinhan.pg.wealthreport.domain.error.WealthReportErrorCode;
 import com.shinhan.pg.wealthreport.domain.model.AssetSnapshot;
 
 import java.time.Instant;
+import java.util.HashSet;
 
-/**
- * <pre>
- * [MVP4-F09] 같은 자료 시점·거래 효과·버전을 사용한다. 지연 이벤트 허용 범위·재구축 포함 기준은 미정.
- * TODO: 이 파일에 합의된 규칙과 불변식만 구현한다. Spring·JPA·Kafka·HTTP에 의존하지 않는다.
- * </pre>
- */
 public final class SnapshotConsistencyPolicy {
-    public void validateSnapshot(AssetSnapshot snapshot, Instant requestedAsOf) {
-        throw new FeatureNotImplementedException("MVP4-F09");
+    public void validateSnapshot(AssetSnapshot s, Instant requestedAsOf) {
+        if (s == null
+                || s.id() == null
+                || s.userId() == null
+                || !requestedAsOf.equals(s.asOf())
+                || s.from() == null
+                || s.to() == null
+                || !s.from().isBefore(s.to())
+                || s.to().isAfter(s.asOf())
+                || s.capturedAt() == null
+                || s.asOf().isAfter(s.capturedAt())
+                || s.sourceVersion() == null
+                || s.sourceVersion().isBlank()
+                || s.accounts().isEmpty()) fail();
+        var ids = new HashSet<java.util.UUID>();
+        for (var a : s.accounts())
+            if (a.accountId() == null
+                    || !ids.add(a.accountId())
+                    || a.version() < 0
+                    || a.balance() == null
+                    || a.cashIn() == null
+                    || a.cashOut() == null
+                    || a.cashIn().signum() < 0
+                    || a.cashOut().signum() < 0
+                    || !"KRW".equals(a.currency())) fail();
+    }
+
+    private void fail() {
+        throw new ReportException(WealthReportErrorCode.SNAPSHOT_INCOMPLETE);
     }
 }

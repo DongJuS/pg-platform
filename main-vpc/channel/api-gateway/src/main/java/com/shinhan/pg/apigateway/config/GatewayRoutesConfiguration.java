@@ -76,6 +76,18 @@ public class GatewayRoutesConfiguration {
                                 r.order(5)
                                         .path("/api/v1/payments/**")
                                         .uri(clients.payment().baseUrl()))
+                .route(
+                        "wealth-report",
+                        r ->
+                                r.order(6)
+                                        .path("/api/v1/wealth/reports", "/api/v1/wealth/reports/**")
+                                        .metadata("response-timeout", 100000L)
+                                        .uri(
+                                                clients.wealthReport() == null
+                                                        ? "http://localhost:8088"
+                                                        : clients.wealthReport()
+                                                                .baseUrl()
+                                                                .toString()))
                 .build();
     }
 }

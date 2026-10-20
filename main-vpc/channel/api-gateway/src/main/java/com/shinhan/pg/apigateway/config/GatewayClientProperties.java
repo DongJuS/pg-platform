@@ -15,7 +15,20 @@ public record GatewayClientProperties(
         ServiceEndpoint account,
         ServiceEndpoint ledger,
         ServiceEndpoint transfer,
-        ServiceEndpoint payment) {
+        ServiceEndpoint payment,
+        ServiceEndpoint wealthReport) {
+
+    @org.springframework.boot.context.properties.bind.ConstructorBinding
+    public GatewayClientProperties {}
+
+    public GatewayClientProperties(
+            ServiceEndpoint a,
+            ServiceEndpoint b,
+            ServiceEndpoint c,
+            ServiceEndpoint d,
+            ServiceEndpoint e) {
+        this(a, b, c, d, e, new ServiceEndpoint(URI.create("http://localhost:8088")));
+    }
 
     public record ServiceEndpoint(URI baseUrl) {}
 }

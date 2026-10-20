@@ -1,17 +1,39 @@
 package com.shinhan.pg.wealthreport.domain.policy;
 
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+import com.shinhan.pg.common.commonmoney.Money;
+import com.shinhan.pg.wealthreport.domain.error.ReportException;
+import com.shinhan.pg.wealthreport.domain.error.WealthReportErrorCode;
 import com.shinhan.pg.wealthreport.domain.model.AssetSnapshot;
 import com.shinhan.pg.wealthreport.domain.model.FinancialMetrics;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 /**
- * <pre>
- * [MVP4-F08] Java에서 지표와 계산 버전·asOf를 확정한다. 금융 산식·반올림 상세는 미정이므로 수치를 생성하지 않는다.
- * TODO: 이 파일에 합의된 규칙과 불변식만 구현한다. Spring·JPA·Kafka·HTTP에 의존하지 않는다.
- * </pre>
+ * Proposed deposit-only policy, gated by explicit configuration until user confirmation. Gross
+ * per-account flows include internal transfers; no FX, net-worth or returns are inferred. Source
+ * interval is [from,to); closing balance includes postings <= asOf.
  */
 public final class FinancialMetricsCalculator {
-    public FinancialMetrics calculate(AssetSnapshot snapshot) {
-        throw new FeatureNotImplementedException("MVP4-F08");
+    public static final String VERSION = "krw-deposit-gross-v1";
+
+    public FinancialMetrics calculate(AssetSnapshot s) {
+        new SnapshotConsistencyPolicy().validateSnapshot(s, s.asOf());
+        try {
+            BigDecimal balance = BigDecimal.ZERO, in = BigDecimal.ZERO, out = BigDecimal.ZERO;
+            for (var a : s.accounts()) {
+                balance = balance.add(a.balance().setScale(0, RoundingMode.UNNECESSARY));
+                in = in.add(a.cashIn().setScale(0, RoundingMode.UNNECESSARY));
+                out = out.add(a.cashOut().setScale(0, RoundingMode.UNNECESSARY));
+            }
+            return new FinancialMetrics(
+                    Money.of(balance, java.util.Currency.getInstance("KRW")),
+                    Money.of(in, java.util.Currency.getInstance("KRW")),
+                    Money.of(out, java.util.Currency.getInstance("KRW")),
+                    s.asOf(),
+                    VERSION);
+        } catch (ArithmeticException | IllegalArgumentException e) {
+            throw new ReportException(WealthReportErrorCode.SNAPSHOT_INCOMPLETE);
+        }
     }
 }

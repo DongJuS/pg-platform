@@ -1,24 +1,59 @@
 package com.shinhan.pg.wealthreport.adapter.in.kafka;
 
+import com.shinhan.pg.common.eventcontracts.EventCodec;
+import com.shinhan.pg.common.eventcontracts.LedgerPostedEvent;
+import com.shinhan.pg.common.eventcontracts.TransferCompletedEvent;
 import com.shinhan.pg.wealthreport.application.command.UpdateReportSnapshotCommand;
 import com.shinhan.pg.wealthreport.application.port.in.UpdateReportSnapshotUseCase;
 
+import org.springframework.kafka.annotation.KafkaListener;
+
 /**
- * <pre>
- * [MVP4-F05,MVP4-F09] Kafka 이체·결제 완료로 스냅샷을 갱신한다. 보고서 생성을 호출하지 않는다.
- * TODO: 이벤트 ID 중복 제거, 일자별 집계
- * TODO: 업무 거래 식별자로 중복 집계를 방지하고 보고서 자료 시점을 고정. 지연 이벤트·재구축의 포함 기준은 Q24에서 검토.
- * TODO: KafkaListener/cron·payload mapping·ack/DLQ는 최종 계약 후 등록한다. HTTP API가 아니다.
- * </pre>
+ * Notification-only projection. Listener returns only after durable local commit, failures are not
+ * acked. No report generation, fake payment event contract or cross-topic amount accumulation.
  */
 public final class UpdateReportSnapshotConsumerSkeleton {
     private final UpdateReportSnapshotUseCase useCase;
 
-    public UpdateReportSnapshotConsumerSkeleton(UpdateReportSnapshotUseCase useCase) {
-        this.useCase = java.util.Objects.requireNonNull(useCase);
+    public UpdateReportSnapshotConsumerSkeleton(UpdateReportSnapshotUseCase u) {
+        useCase = u;
     }
 
-    public void handle(UpdateReportSnapshotCommand command) {
-        useCase.updateReportSnapshot(command);
+    public void handle(UpdateReportSnapshotCommand c) {
+        useCase.updateReportSnapshot(c);
+    }
+
+    @KafkaListener(
+            containerFactory = "reportKafkaFactory",
+            topics = "ledger.posted",
+            groupId = "wealth-report-snapshots",
+            autoStartup = "${platform.report.events.enabled:false}")
+    public void ledger(byte[] payload, org.springframework.kafka.support.Acknowledgment ack) {
+        var e = EventCodec.fromBytes(payload, LedgerPostedEvent.class);
+        handle(
+                new UpdateReportSnapshotCommand(
+                        "ledger.posted",
+                        e.eventId(),
+                        e.transactionId(),
+                        e.journalId(),
+                        e.occurredAt()));
+        ack.acknowledge();
+    }
+
+    @KafkaListener(
+            containerFactory = "reportKafkaFactory",
+            topics = "transfer.completed",
+            groupId = "wealth-report-snapshots",
+            autoStartup = "${platform.report.events.enabled:false}")
+    public void transfer(byte[] payload, org.springframework.kafka.support.Acknowledgment ack) {
+        var e = EventCodec.fromBytes(payload, TransferCompletedEvent.class);
+        handle(
+                new UpdateReportSnapshotCommand(
+                        "transfer.completed",
+                        e.eventId(),
+                        e.transactionId(),
+                        e.journalId(),
+                        e.occurredAt()));
+        ack.acknowledge();
     }
 }
