@@ -24,11 +24,15 @@ public class ReportKafkaConfiguration {
     public ConcurrentKafkaListenerContainerFactory<String, byte[]> reportKafkaFactory(
             KafkaProperties p, ObjectProvider<SslBundles> bundles) {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, byte[]>();
+        var consumerProperties = p.buildConsumerProperties(bundles.getIfAvailable());
+        // A new projection group must read retained durable events even when it starts after a
+        // producer.
+        consumerProperties.putIfAbsent(
+                org.apache.kafka.clients.consumer.ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+                "earliest");
         factory.setConsumerFactory(
                 new DefaultKafkaConsumerFactory<>(
-                        p.buildConsumerProperties(bundles.getIfAvailable()),
-                        new StringDeserializer(),
-                        new ByteArrayDeserializer()));
+                        consumerProperties, new StringDeserializer(), new ByteArrayDeserializer()));
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         var errors =
                 new DefaultErrorHandler(new FixedBackOff(1000, FixedBackOff.UNLIMITED_ATTEMPTS));
