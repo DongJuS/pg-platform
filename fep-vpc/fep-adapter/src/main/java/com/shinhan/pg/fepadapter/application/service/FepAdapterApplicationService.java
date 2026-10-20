@@ -23,9 +23,9 @@ import com.shinhan.pg.fepadapter.application.result.ExchangeSettlementFileResult
 import com.shinhan.pg.fepadapter.application.result.QueryInstitutionResultResult;
 import com.shinhan.pg.fepadapter.application.result.SendSwiftMessageResult;
 
-/** 기능별 계약과 TODO를 모은 application 구현 자리.
- * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * 현재 모든 업무 메서드는 명시적 미구현 예외를 던지며 성공 DTO·가짜 금융 결과를 반환하지 않는다.
+/**
+ * 기능별 계약과 TODO를 모은 application 구현 자리. Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB
+ * 트랜잭션 안에서 수행하지 않는다. 현재 모든 업무 메서드는 명시적 미구현 예외를 던지며 성공 DTO·가짜 금융 결과를 반환하지 않는다.
  */
 public final class FepAdapterApplicationService
         implements DispatchInstitutionMessageUseCase,
@@ -40,6 +40,7 @@ public final class FepAdapterApplicationService
     private final FepMessageWritePort fepMessageWritePort;
     private final FepMessageRepository fepMessageRepository;
     private final FepTransmissionAttemptRepository fepTransmissionAttemptRepository;
+    private final SwiftFepService swift;
 
     public FepAdapterApplicationService(
             PgInstitutionPort pgInstitutionPort,
@@ -49,6 +50,27 @@ public final class FepAdapterApplicationService
             FepMessageWritePort fepMessageWritePort,
             FepMessageRepository fepMessageRepository,
             FepTransmissionAttemptRepository fepTransmissionAttemptRepository) {
+        this(
+                pgInstitutionPort,
+                swiftInstitutionPort,
+                kofiuInstitutionPort,
+                clearingInstitutionPort,
+                fepMessageWritePort,
+                fepMessageRepository,
+                fepTransmissionAttemptRepository,
+                null);
+    }
+
+    public FepAdapterApplicationService(
+            PgInstitutionPort pgInstitutionPort,
+            SwiftInstitutionPort swiftInstitutionPort,
+            KofiuInstitutionPort kofiuInstitutionPort,
+            ClearingInstitutionPort clearingInstitutionPort,
+            FepMessageWritePort fepMessageWritePort,
+            FepMessageRepository fepMessageRepository,
+            FepTransmissionAttemptRepository fepTransmissionAttemptRepository,
+            SwiftFepService swift) {
+        this.swift = swift;
         this.pgInstitutionPort = java.util.Objects.requireNonNull(pgInstitutionPort);
         this.swiftInstitutionPort = java.util.Objects.requireNonNull(swiftInstitutionPort);
         this.kofiuInstitutionPort = java.util.Objects.requireNonNull(kofiuInstitutionPort);
@@ -60,6 +82,8 @@ public final class FepAdapterApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [CMN-F04] 내부 REST 금융 대외 전문 접수. 기관 최종 결과를 즉시 접수 성공과 구분한다.
      * TODO: 금융 FEP의 송수신·인증·결과 추적 계약을 후속 검토. 외부 LLM 요청은 기존 AI Security Gateway가 중계하며 이 보류 항목의 대상에서 제외. / 예외: 금융 연동 타임아웃·재전송·웹훅 경로는 미정.
@@ -74,6 +98,8 @@ public final class FepAdapterApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP2-F06,MVP5-F06] 기관 callback/result 수신 위치. 구체 인증·반환·전파 계약은 후속이다.
      * TODO: 이벤트 ID 중복 제거, 상태 전이 규칙으로 역순 처리 / 예외: 400 서명 오류
@@ -88,6 +114,8 @@ public final class FepAdapterApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP5-F04,MVP7-F03] 동일 messageKey 결과 조회. 접수와 최종 결과를 구분한다.
      * TODO: pacs.008 생성, XSD 검증, fep_db messages 저장 / 예외: 422 XSD 실패
@@ -103,6 +131,8 @@ public final class FepAdapterApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP5-F04] FEP 전문 송신
      * API 초안: POST /internal/v1/fep/swift/messages
@@ -124,6 +154,7 @@ public final class FepAdapterApplicationService
      */
     @Override
     public SendSwiftMessageResult sendSwiftMessage(SendSwiftMessageCommand command) {
+        if (swift != null) return swift.send(command);
         // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
         // TODO 2: pacs.008 생성, XSD 검증, fep_db messages 저장
         // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
@@ -132,6 +163,8 @@ public final class FepAdapterApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP7-F03] 정산 파일 송수신
      * API 초안: POST /internal/v1/fep/settlement/files

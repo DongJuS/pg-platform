@@ -25,16 +25,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
-/** 기능별 계약과 TODO를 모은 application 구현 자리.
- * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * MVP1 업무는 실제 저장소를 사용하며, 범위 밖의 미구현 기능만 501을 반환한다.
+/**
+ * 기능별 계약과 TODO를 모은 application 구현 자리. Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB
+ * 트랜잭션 안에서 수행하지 않는다. MVP1 업무는 실제 저장소를 사용하며, 범위 밖의 미구현 기능만 501을 반환한다.
  *
- * <p>구현 확정(MVP1-F07~F10): MariaDB accounts 테이블 기반으로 실동작한다. 잔액은 다루지 않는다(ledger 소유).
- * 인증 주체는 gateway가 JWT 검증 후 전달한 X-User-Id → actorUserId다. PUBLIC 메서드는 actorUserId가
- * 없으면 401(UNAUTHENTICATED)로 거절한다(인증 문맥 계약 §3).
+ * <p>구현 확정(MVP1-F07~F10): MariaDB accounts 테이블 기반으로 실동작한다. 잔액은 다루지 않는다(ledger 소유). 인증 주체는 gateway가
+ * JWT 검증 후 전달한 X-User-Id → actorUserId다. PUBLIC 메서드는 actorUserId가 없으면 401(UNAUTHENTICATED)로 거절한다(인증
+ * 문맥 계약 §3).
  */
 public class AccountApplicationService
-        implements com.shinhan.pg.account.application.port.in.InspectAccountUseCase, OpenAccountUseCase,
+        implements com.shinhan.pg.account.application.port.in.InspectAccountUseCase,
+                OpenAccountUseCase,
                 ListAccountsUseCase,
                 GetAccountUseCase,
                 ChangeAccountStatusUseCase {
@@ -50,17 +51,29 @@ public class AccountApplicationService
     private final AccountWritePort accountWritePort;
     private final AccountRepository accountRepository;
     private final AccountStatusPolicy accountStatusPolicy = new AccountStatusPolicy();
+    private final boolean developmentUsdEnabled;
 
     public AccountApplicationService(
             LedgerAccountPort ledgerAccountPort,
             AccountWritePort accountWritePort,
             AccountRepository accountRepository) {
+        this(ledgerAccountPort, accountWritePort, accountRepository, false);
+    }
+
+    public AccountApplicationService(
+            LedgerAccountPort ledgerAccountPort,
+            AccountWritePort accountWritePort,
+            AccountRepository accountRepository,
+            boolean developmentUsdEnabled) {
+        this.developmentUsdEnabled = developmentUsdEnabled;
         this.ledgerAccountPort = java.util.Objects.requireNonNull(ledgerAccountPort);
         this.accountWritePort = java.util.Objects.requireNonNull(accountWritePort);
         this.accountRepository = java.util.Objects.requireNonNull(accountRepository);
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F07] 가상 계좌 개설
      * API 초안: POST /api/v1/accounts
@@ -84,7 +97,9 @@ public class AccountApplicationService
     public OpenAccountResult openAccount(OpenAccountCommand command) {
         // 1. 인증된 주체·자원 접근 범위와 입력을 확인한다.
         requireActor(command.actorUserId());
-        if (command.currency() == null || !MVP1_CURRENCY.equals(command.currency())) {
+        if (command.currency() == null
+                || !(MVP1_CURRENCY.equals(command.currency())
+                        || (developmentUsdEnabled && "USD".equals(command.currency())))) {
             // TODO[CONTRACT]: 지원 통화 목록은 미정 — MVP1은 입력 근거대로 KRW만 허용한다.
             throw new ApplicationException(AccountErrorCode.INVALID_REQUEST);
         }
@@ -102,6 +117,8 @@ public class AccountApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F08] 내 계좌 목록
      * API 초안: GET /api/v1/accounts
@@ -131,8 +148,7 @@ public class AccountApplicationService
             throw new ApplicationException(AccountErrorCode.INVALID_REQUEST);
         }
         // 2. 본인 계좌만 조회 — owner_id = 인증 주체. 다음 페이지 존재 여부는 size+1 조회로 판단.
-        var rows =
-                accountRepository.findByOwnerId(command.actorUserId(), page * size, size + 1);
+        var rows = accountRepository.findByOwnerId(command.actorUserId(), page * size, size + 1);
         var hasMore = rows.size() > size;
         var accounts =
                 rows.stream()
@@ -151,6 +167,8 @@ public class AccountApplicationService
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F09] 계좌 상세
      * API 초안: GET /api/v1/accounts/{accountId}
@@ -194,14 +212,26 @@ public class AccountApplicationService
     }
 
     /** Minimal account authority lookup for Ledger/Transfer; never returns a balance. */
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public GetAccountResult inspectAccount(UUID accountId) {
-        var account = accountRepository.findById(accountId)
-            .orElseThrow(() -> new ApplicationException(AccountErrorCode.ACCOUNT_NOT_FOUND));
-        return new GetAccountResult(account.id(), account.ownerId(), account.accountNumber(), account.alias(), account.currency(), account.status());
+        var account =
+                accountRepository
+                        .findById(accountId)
+                        .orElseThrow(
+                                () -> new ApplicationException(AccountErrorCode.ACCOUNT_NOT_FOUND));
+        return new GetAccountResult(
+                account.id(),
+                account.ownerId(),
+                account.accountNumber(),
+                account.alias(),
+                account.currency(),
+                account.status());
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP1-F10] 계좌 상태 변경
      * API 초안: PATCH /api/v1/accounts/{accountId}/status
@@ -221,8 +251,8 @@ public class AccountApplicationService
      * 출처: https://app.notion.com/p/3faad9292a49813aa4d2f0ad91e9efac
      * </pre>
      *
-     * <p>구현 확정: INTERNAL 대상 — X-Internal-Caller 헤더 검증은 Controller가 수행한다(없으면 403).
-     * 서비스 간 인증 토큰은 미정(지시서 §5-③)이므로 여기서는 소유권 검사를 하지 않고 전이 규칙만 적용한다.
+     * <p>구현 확정: INTERNAL 대상 — X-Internal-Caller 헤더 검증은 Controller가 수행한다(없으면 403). 서비스 간 인증 토큰은
+     * 미정(지시서 §5-③)이므로 여기서는 소유권 검사를 하지 않고 전이 규칙만 적용한다.
      */
     @Override
     @Transactional

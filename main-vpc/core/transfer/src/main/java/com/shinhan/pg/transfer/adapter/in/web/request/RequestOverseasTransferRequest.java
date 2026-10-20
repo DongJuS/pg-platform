@@ -10,7 +10,13 @@ public record RequestOverseasTransferRequest(
         String recipientAccount,
         String bic,
         BigDecimal amount,
-        String currency) {
+        String currency,
+        String otpToken) {
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    public void unsupportedField(String name, Object ignored) {
+        throw com.shinhan.pg.common.swiftmessages.SwiftProblem.invalid();
+    }
+
     @Override
     public String toString() {
         return "RequestOverseasTransferRequest[REDACTED]";

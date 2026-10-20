@@ -15,7 +15,7 @@ parser.add_argument('run_directory',type=Path)
 run=parser.parse_args().run_directory.resolve()
 context=json.loads((run/'context.json').read_text())
 project=context['project']
-if not project.startswith('pg_mvp4_') or (run/'mvp4-result.json').exists():
+if not project.startswith(('pg_mvp4_','pg_mvp5_')) or (run/'mvp4-result.json').exists():
     raise SystemExit('Refusing report acceptance outside a fresh isolated MVP4 run')
 private_env=dict(line.split('=',1) for line in (run/'local.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
 report={'passed':False,'checks':[],'explanation_source':'TEST_DOUBLE','real_llm_report_completed':False,'external_llm_calls':0}
@@ -113,6 +113,10 @@ try:
     deadline=time.monotonic()+20
     while time.monotonic()<deadline and sql('wealth_report_db','select count(*) from snapshot_effects;')=='0': time.sleep(.5)
     check('Actual Kafka completion events update separate durable projection',int(sql('wealth_report_db','select count(*) from snapshot_effects;'))>0)
+    # Independent Kafka topics have no cross-topic delivery order. Wait for both observations,
+    # rather than treating the first Ledger event as proof that Transfer consumption has finished.
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline and sql('wealth_report_db','select count(*) from (select transaction_id from snapshot_events group by transaction_id having count(distinct topic)>1) q;')=='0': time.sleep(.5)
     check('Cross-topic events share one financial effect identity',sql('wealth_report_db','select count(*) from (select transaction_id,count(distinct topic) n from snapshot_events group by transaction_id having count(distinct topic)>1) q;')!='0')
     check('Events never auto-generate a report',sql('wealth_report_db','select count(*) from asset_reports;')=='2')
     # Exercise actual storage failure; the successful receipt and its PDF must remain intact.

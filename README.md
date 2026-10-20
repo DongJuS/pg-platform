@@ -1,6 +1,6 @@
 # pg-platform
 
-Banking MVP1 is implemented and verified locally. See [MVP1 completion and acceptance checks](infra/docker/MVP1_COMPLETION.md) for the current scope and configuration. Other MVPs remain in progress.
+MVP1 banking and MVP2 payments are implemented locally. MVP3 provides AI preparation/security checks, and MVP4 provides a synchronous report pipeline with explicit TEST_DOUBLE explanations, not actual LLM inference. MVP5 implements development-only USD SWIFT remittance through a local Mock. See [MVP5 scope, gates and verification](main-vpc/external/swift/SKELETON.md). Production activation remains deferred.
 
 <p align="center">
   <img src="docs/readme/system-architecture.png" width="100%" alt="pg-platform system architecture. Users reach a load balancer and the API Gateway in the main VPC. The core layer holds internet banking, payment processing, and clearing and settlement; the information layer holds wealth reporting and anti-money laundering; the external layer holds overseas remittance; and the data subnets hold PostgreSQL, MariaDB, Redis and Kafka. The AI VPC and the FEP VPC hold the only internet exits, and a mock VPC simulates the external institutions.">
@@ -8,7 +8,7 @@ Banking MVP1 is implemented and verified locally. See [MVP1 completion and accep
 
 pg-platform is a payment and banking platform laid out the way a Korean bank splits its systems. A channel layer faces customers, a core layer owns accounts and the ledger, an external layer handles overseas messages, and an information layer runs reports and anti-money-laundering checks. Every request to an outside institution leaves through one front-end processor (FEP), and every request to an outside AI model leaves through a separate AI gateway.
 
-The repository is a Gradle monorepo of 16 Spring Boot services and 5 shared libraries, plus Terraform for a four-VPC AWS network. Its design goal is that money stays correct when something fails. Its banking MVP1 has real authentication, account, ledger and transfer implementations; the remaining MVPs retain their explicit implementation TODOs.
+The repository is a Gradle monorepo of 16 Spring Boot services and 6 shared libraries, plus Terraform for a four-VPC AWS network. Its design goal is that money stays correct when something fails. Banking, Mock payment processing, AI preparation, the development report pipeline and development SWIFT remittance have implementations; AML, settlement and real external LLM/bank integration remain deferred.
 
 ## Works with
 
@@ -39,9 +39,9 @@ A request moves through the platform in five steps.
 | Flow | Path |
 | --- | --- |
 | Domestic transfer | `transfer` calls `ledger` over REST. `ledger` locks the account rows, writes the posting and an outbox row, and emits `ledger.posted`. `transfer` then confirms the transfer once, from the REST reply or from the event, and emits `transfer.completed`. |
-| Overseas remittance | `transfer` asks `ledger` for a provisional posting and emits `transfer.outbound`. `swift` maps it to MT103 fields and sends it to `fep-adapter`, which builds the pacs.008 message and validates it against the XSD. The pacs.002 result comes back as `fep.ack`, and `ledger` confirms or reverses the posting. Retries reuse the same UETR. |
+| Overseas remittance | `transfer` asks `ledger` for an actual USD holding-account posting and emits `transfer.outbound`. `swift` maps it to MT103 fields and sends it to `fep-adapter`, which independently validates the frozen pacs.008 message against the complete XSD and supported subset. Swift validates pacs.002 and emits `fep.ack`; Ledger applies the final effect once and emits `ledger.overseas-applied`. Transfer then confirms its result. Manual retransmission is separately gated and reuses the same UETR. |
 | Card payment | `payment` sends approval, cancel and refund requests through `fep-adapter` to the PG. A reconciliation run compares both sides. |
-| Wealth report | `wealth-report` pseudonymizes personal data, asks `ai-gateway` for a draft, verifies it, restores the tokens, renders a PDF to S3 and returns the finished report in the same request. |
+| Wealth report | The current development pipeline collects owner-authorized Ledger data, validates a TEST_DOUBLE explanation, creates a Korean PDF and stores it privately in PostgreSQL before responding. Real LLM inference, token restoration and operating S3 are deferred. |
 | Anti-money laundering | `aml` consumes completed transfer, payment and remittance events, applies rules, opens cases and sends reports to KoFIU through FEP. |
 | Daily close | `settlement` closes the day at 00:00, computes net amounts, posts them to `ledger` and exchanges the settlement file through FEP. |
 
@@ -49,7 +49,7 @@ A request moves through the platform in five steps.
 
 ---
 
-The scope is split into seven MVPs. Each feature ID maps to an input port, a use case and its files. MVP1 routes now execute real operations in the local Docker profile. Features outside MVP1 remain explicit TODO/501 or deferred contracts.
+The scope is split into seven MVPs. Each feature ID maps to an input port, a use case and its files. MVP1 routes now execute real operations in the local Docker profile. MVP2 payment paths, MVP3 preparation, MVP4 synthetic report paths and explicit MVP5 development paths are also implemented; their limits and activation gates are recorded in each service checklist.
 
 | MVP | Feature area | Services |
 | --- | --- | --- |

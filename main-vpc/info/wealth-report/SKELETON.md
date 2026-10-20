@@ -83,3 +83,7 @@ python3 -m unittest discover -s infra/docker -p 'test_ops_api.py' -v
 | 실제 PDF | 원장 분개 후 잔액 80000·출금 20000 저장 및 PDF 다운로드. 한글·표·단일/두 페이지 시각 확인. 설명만 TEST_DOUBLE. |
 | 재시작 | 만료 DRAFTING 행을 시험용으로 만든 뒤 실제 컨테이너를 재시작해 INTERRUPTED 표시·단계 보존·추가 PDF 없음 확인. 실제 유료 추론 중 강제 종료 검증은 아니다. |
 | 보존 | 기존 컨테이너·볼륨·로컬 변경 보존, 시험 자원만 정리. 실제 LLM 0회, AWS/NAT 생성·활성화 없음. |
+
+## MVP5 회귀에서 확인한 Kafka 시작 시점 보정
+
+Figma 29:2의 비동기 스냅샷 갱신 계약과 ADR 0001의 at-least-once 전제를 유지한다. 기존 reportKafkaFactory는 새 그룹이 늦게 시작하면 Kafka 기본 latest로 이미 발행된 사건을 건너뛸 수 있었다. 실제 분리 E2E에서 transfer.completed 파티션의 offset=1 시작을 관찰했고, ReportConsumerReplayIT가 ‘사건 선발행 → 새 그룹 시작’에서 누락을 재현했다. factory의 기본 초기 위치를 earliest로 정한 후 같은 실제 Kafka 시험이 통과했다. 기존 커밋된 offset은 유지되며 숫자 중복 계산이나 자동 보고서 생성으로 변경하지 않는다.

@@ -14,4 +14,21 @@ public interface FepSwiftPort {
     UUID send(SubmitSwiftCommand command);
 
     UUID retry(RetrySwiftCommand command);
+
+    default UUID send(SubmitSwiftCommand command, String xml, String reference) {
+        throw new UnsupportedOperationException();
+    }
+
+    default Optional<String> query(String uetr) {
+        throw new UnsupportedOperationException();
+    }
+
+    default java.util.List<String> queryAll(String uetr) {
+        return query(uetr).stream().toList();
+    }
+
+    default com.shinhan.pg.swift.application.readmodel.SwiftQueryResult queryResult(String uetr) {
+        return new com.shinhan.pg.swift.application.readmodel.SwiftQueryResult(
+                queryAll(uetr), false);
+    }
 }

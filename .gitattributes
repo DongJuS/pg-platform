@@ -1,0 +1,2 @@
+# Keep the unmodified published ISO schemas byte-identical to SOURCES.json.
+libs/swift-messages/src/main/resources/xsd/*.xsd -text whitespace=cr-at-eol

@@ -19,7 +19,7 @@ parser.add_argument('run_directory', type=Path)
 root = parser.parse_args().run_directory.resolve()
 context = json.loads((root / 'context.json').read_text())
 project = context['project']
-if not project.startswith(('pg_mvp2_', 'pg_mvp3_', 'pg_mvp4_')) or (root / 'mvp2-result.json').exists():
+if not project.startswith(('pg_mvp2_', 'pg_mvp3_', 'pg_mvp4_','pg_mvp5_')) or (root / 'mvp2-result.json').exists():
     raise SystemExit('Refusing financial acceptance outside a fresh isolated MVP2 run')
 secrets = dict(line.split('=', 1) for line in (root/'local.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
 report = {'passed': False, 'checks': [], 'financial_mutations': 0, 'opening_funds_fixture_only': True}

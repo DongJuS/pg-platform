@@ -13,7 +13,31 @@ public record RequestOverseasTransferCommand(
         String bic,
         BigDecimal amount,
         String currency,
-        String idempotencyKey) {
+        String idempotencyKey,
+        String otpToken) {
+    public RequestOverseasTransferCommand(
+            UUID requestId,
+            UUID actorUserId,
+            UUID fromAccountId,
+            String recipientName,
+            String recipientAccount,
+            String bic,
+            BigDecimal amount,
+            String currency,
+            String idempotencyKey) {
+        this(
+                requestId,
+                actorUserId,
+                fromAccountId,
+                recipientName,
+                recipientAccount,
+                bic,
+                amount,
+                currency,
+                idempotencyKey,
+                null);
+    }
+
     @Override
     public String toString() {
         return "RequestOverseasTransferCommand[REDACTED]";

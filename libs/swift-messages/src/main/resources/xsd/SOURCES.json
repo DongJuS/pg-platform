@@ -1,0 +1,23 @@
+{
+  "official_catalogue": "https://www.iso20022.org/catalogue-messages/iso-20022-messages-archive?search=pacs.008",
+  "official_downloads": {
+    "pacs.008.001.08": "https://www.iso20022.org/message/14231/download",
+    "pacs.002.001.10": "https://www.iso20022.org/message/14061/download"
+  },
+  "official_download_result": "HTTP 403 in this environment; unmodified generated ISO schemas retrieved from public Moov mirror",
+  "files": [
+    {
+      "name": "pacs.002.001.10.xsd",
+      "source": "https://raw.githubusercontent.com/moov-io/fedwire20022/master/xsd/iso/pacs.002.001.10.xsd",
+      "sha256": "d14da6304db5178b1afc7d8ed6cc6073e6e1a143fc79d9ba66d3246d4a654e90",
+      "bytes": 58000
+    },
+    {
+      "name": "pacs.008.001.08.xsd",
+      "source": "https://raw.githubusercontent.com/moov-io/fedwire20022/master/xsd/iso/pacs.008.001.08.xsd",
+      "sha256": "cf048155f70cacd03f1f1dfadf66cba8752be93c249c267351782fd6adb023f7",
+      "bytes": 58040
+    }
+  ],
+  "compatibility": "Complete ISO XSD structural validation only; no SWIFT FIN/CBPR+/network or institution certification"
+}

@@ -35,6 +35,14 @@ import javax.sql.DataSource;
 @Profile("skeleton")
 public class LedgerSkeletonConfiguration {
     @Bean
+    public com.shinhan.pg.ledger.application.service.ReserveOverseasService reserveOverseasService(
+            com.shinhan.pg.ledger.application.port.out.AccountQueryPort accounts,
+            LedgerAtomicWritePort ledger) {
+        return new com.shinhan.pg.ledger.application.service.ReserveOverseasService(
+                accounts, (com.shinhan.pg.ledger.application.port.out.OverseasLedgerPort) ledger);
+    }
+
+    @Bean
     public com.shinhan.pg.ledger.application.port.out.AccountQueryPort accountQueryPort(
             org.springframework.core.env.Environment env) {
         return new com.shinhan.pg.ledger.adapter.out.account.AccountQueryRestAdapter(env);

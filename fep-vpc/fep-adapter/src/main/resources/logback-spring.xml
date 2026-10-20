@@ -1,0 +1,16 @@
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+  <!-- Synthetic private SWIFT data is isolated from the console/central log pipeline.
+       Hourly rotation plus 47 archived hours limits retention to at most 48 hours. -->
+  <appender name="SWIFT_PRIVATE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${SWIFT_PRIVATE_LOG_DIR:-/tmp/swift-private}/current.log</file>
+    <encoder><pattern>%date{ISO8601,UTC} %msg%n</pattern></encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>${SWIFT_PRIVATE_LOG_DIR:-/tmp/swift-private}/private.%d{yyyy-MM-dd_HH,UTC}.log.gz</fileNamePattern>
+      <maxHistory>47</maxHistory><cleanHistoryOnStart>true</cleanHistoryOnStart><totalSizeCap>100MB</totalSizeCap>
+    </rollingPolicy>
+  </appender>
+  <logger name="swift.private" level="INFO" additivity="false"><appender-ref ref="SWIFT_PRIVATE"/></logger>
+  <root level="INFO"><appender-ref ref="CONSOLE"/></root>
+</configuration>

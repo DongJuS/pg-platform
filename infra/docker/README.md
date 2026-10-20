@@ -168,3 +168,9 @@ This also runs MVP1 regression, provider faults, reservations, duplicate/out-of-
 `AI_PREPARATION_WEALTH_TOKEN`은 `init-env.py`가 생성하는 호출자 전용 비밀이다. AI Gateway는 금융 공통 토큰을 인증에 사용하지 않는다. 새 env 파일을 생성하거나 기존 비밀 관리 절차로 별도 주입해야 하며 미설정은 기본 차단이다. PostgreSQL ai_gateway_db의 Flyway V2는 원문/마스킹본/복원 매핑 없는 감사 테이블을 만든다. 기존 스택에는 이번에 적용하지 않았다.
 
 `python3 infra/docker/run-mvp1-e2e.py --suite MVP3 --observability --output /private/tmp/mvp3-result.json`은 새 프로젝트에서 MVP1/2 회귀와 AI 준비 검사를 함께 실행하고 AI 인터넷 출구를 제거한 상태로 검증한다. 기존 고객 컨테이너/데이터를 재사용하지 않는다. API와 한계는 [AI 구현 체크리스트](../../ai-vpc/ai-gateway/SKELETON.md)를 따른다. 외부 LLM·API 키·AWS/NAT 활성화는 포함하지 않는다.
+
+## MVP5 isolated SWIFT acceptance
+
+`python3 infra/docker/run-mvp1-e2e.py --suite MVP5 --output /private/tmp/mvp5-result.json` runs MVP1–MVP4 regressions and the USD/no-FX/zero-fee remittance flow. It creates fresh service-owned databases, Kafka topics, caller credentials, a durable local Mock and private log directories. A test-only internal proxy disconnects an actual committed Ledger response for the recovery check. It has no host port and is never added to the canonical customer stack.
+
+The runner alone enables `swift-test`, explicit Mock retransmission and a synthetic administrator. Default operating activation/retransmission remain disabled. Containers, volumes and private test data are cleaned up; original customer containers are checked for preservation. `--swift-only` is a diagnostic shortcut and must not be reported as complete regression acceptance. See [MVP5 contract and limitations](../../main-vpc/external/swift/SKELETON.md).
