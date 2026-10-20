@@ -47,10 +47,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * [WO-A5 인수 기준] ADR 0001 6-A 잔액 불변식의 실제 MariaDB 검증.
- * 같은 계좌에 대한 동시 출금(잔액 초과 혼합) 후에도
- * ① 잔액 = 초기 + 성공 분개 합, ② 음수 잔액 없음, ③ journal unique(transactionId),
- * ④ Outbox 행이 성공 분개와 1:1 임을 확인한다.
+ * [WO-A5 인수 기준] ADR 0001 6-A 잔액 불변식의 실제 MariaDB 검증. 같은 계좌에 대한 동시 출금(잔액 초과 혼합) 후에도 ① 잔액 = 초기 + 성공 분개
+ * 합, ② 음수 잔액 없음, ③ journal unique(transactionId), ④ Outbox 행이 성공 분개와 1:1 임을 확인한다.
  */
 @EnabledIfSystemProperty(named = "integration", matches = "true")
 @Testcontainers
@@ -103,9 +101,86 @@ class LedgerPostingConcurrencyIT {
                         new BalanceProtectionPolicy());
     }
 
+    @Test
+    void reportReadKeepsHistoricalBalanceAndGrossFlowAtOneCutoff() {
+        UUID from = UUID.randomUUID(), to = UUID.randomUUID(), empty = UUID.randomUUID();
+        seedAccount(from, 1000);
+        seedAccount(to, 0);
+        var first =
+                adapter.postWithPessimisticLocks(transferCommand(UUID.randomUUID(), from, to, 100));
+        var cutoff = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        var second =
+                adapter.postWithPessimisticLocks(transferCommand(UUID.randomUUID(), from, to, 200));
+        // Fix historical fixture times, independent of clock/timing and with a later posting
+        // present.
+        jdbc.update(
+                "update journals set posted_at=? where id=?",
+                java.sql.Timestamp.from(cutoff.minusSeconds(10)),
+                first.journalId().toString());
+        jdbc.update(
+                "update journals set posted_at=? where id=?",
+                java.sql.Timestamp.from(cutoff.plusSeconds(10)),
+                second.journalId().toString());
+        var sourceRead =
+                new com.shinhan.pg.ledger.adapter.out.persistence.ReportLedgerSnapshotAdapter(
+                        source);
+        var view =
+                sourceRead.read(
+                        UUID.randomUUID(),
+                        List.of(from, to, empty),
+                        cutoff.minusSeconds(20),
+                        cutoff,
+                        cutoff);
+        assertEquals(3, view.accounts().size());
+        assertEquals(0, view.accounts().get(0).balance().compareTo(BigDecimal.valueOf(900)));
+        assertEquals(0, view.accounts().get(0).cashOut().compareTo(BigDecimal.valueOf(100)));
+        assertEquals(0, view.accounts().get(1).balance().compareTo(BigDecimal.valueOf(100)));
+        assertEquals(0, view.accounts().get(1).cashIn().compareTo(BigDecimal.valueOf(100)));
+        assertEquals(0, view.accounts().get(2).balance().signum());
+        assertTrue(!view.capturedAt().isBefore(view.asOf()));
+    }
+
+    @Test
+    void reportCollectionDoesNotTearAcrossConcurrentAccountUpdates() throws Exception {
+        UUID from = UUID.randomUUID(), to = UUID.randomUUID();
+        seedAccount(from, 1000);
+        seedAccount(to, 0);
+        var reader =
+                new com.shinhan.pg.ledger.adapter.out.persistence.ReportLedgerSnapshotAdapter(
+                        source);
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var writer =
+                    pool.submit(
+                            () -> {
+                                for (int i = 0; i < 20; i++)
+                                    adapter.postWithPessimisticLocks(
+                                            transferCommand(UUID.randomUUID(), from, to, 1));
+                            });
+            for (int i = 0; i < 10; i++) {
+                var cutoff =
+                        java.time.Instant.now()
+                                .minusSeconds(1)
+                                .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+                var view =
+                        reader.read(
+                                UUID.randomUUID(),
+                                List.of(from, to),
+                                cutoff.minusSeconds(60),
+                                cutoff,
+                                cutoff);
+                var sum =
+                        view.accounts().stream()
+                                .map(a -> a.balance())
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                assertEquals(0, sum.compareTo(BigDecimal.valueOf(1000)));
+            }
+            writer.get(30, TimeUnit.SECONDS);
+        }
+    }
+
     /**
-     * 핵심 인수 기준: 잔액 1000인 계좌에 100씩 16건의 동시 출금(잔액 초과 혼합).
-     * 정확히 10건만 성공하고 6건은 INSUFFICIENT_FUNDS로 거절돼야 한다.
+     * 핵심 인수 기준: 잔액 1000인 계좌에 100씩 16건의 동시 출금(잔액 초과 혼합). 정확히 10건만 성공하고 6건은 INSUFFICIENT_FUNDS로 거절돼야
+     * 한다.
      */
     @Test
     void concurrentDebitsPreserveBalanceInvariant() throws Exception {
@@ -182,7 +257,8 @@ class LedgerPostingConcurrencyIT {
         var transactionId = UUID.randomUUID();
 
         var first = adapter.postWithPessimisticLocks(transferCommand(transactionId, from, to, 100));
-        var second = adapter.postWithPessimisticLocks(transferCommand(transactionId, from, to, 100));
+        var second =
+                adapter.postWithPessimisticLocks(transferCommand(transactionId, from, to, 100));
         assertEquals(first.journalId(), second.journalId());
         assertEquals(first.eventId(), second.eventId());
         assertEquals(1L, count("journals"));
@@ -210,7 +286,8 @@ class LedgerPostingConcurrencyIT {
         }
         pool.shutdownNow();
 
-        var distinctJournals = results.stream().map(PostJournalResult::journalId).distinct().count();
+        var distinctJournals =
+                results.stream().map(PostJournalResult::journalId).distinct().count();
         assertEquals(1, distinctJournals);
         assertEquals(2L, count("journals"));
         assertEquals(2L, count("outbox_events"));
@@ -271,7 +348,8 @@ class LedgerPostingConcurrencyIT {
         var from = UUID.randomUUID();
         var to = UUID.randomUUID(); // 미개설 원장 계정
         seedAccount(from, 1000);
-        var result = adapter.postWithPessimisticLocks(transferCommand(UUID.randomUUID(), from, to, 100));
+        var result =
+                adapter.postWithPessimisticLocks(transferCommand(UUID.randomUUID(), from, to, 100));
         assertNotNull(result.journalId());
         assertEquals(0, balanceOf(to).compareTo(BigDecimal.valueOf(100)));
         var currency =
@@ -292,13 +370,10 @@ class LedgerPostingConcurrencyIT {
         var command = transferCommand(UUID.randomUUID(), from, to, 100);
         var result = adapter.postWithPessimisticLocks(command);
 
-        var row =
-                jdbc.queryForMap(
-                        "select destination, routing_key, payload from outbox_events");
+        var row = jdbc.queryForMap("select destination, routing_key, payload from outbox_events");
         assertEquals(EventTopics.LEDGER_POSTED, row.get("destination"));
         assertEquals(command.transactionId().toString(), row.get("routing_key"));
-        var event =
-                EventCodec.fromBytes((byte[]) row.get("payload"), LedgerPostedEvent.class);
+        var event = EventCodec.fromBytes((byte[]) row.get("payload"), LedgerPostedEvent.class);
         assertEquals(result.eventId(), event.eventId());
         assertEquals(command.transactionId(), event.transactionId());
         assertEquals(result.journalId(), event.journalId());
@@ -315,8 +390,7 @@ class LedgerPostingConcurrencyIT {
         var command = transferCommand(UUID.randomUUID(), from, to, 100);
         var result = adapter.postWithPessimisticLocks(command);
 
-        var accounts =
-                new LedgerAccountPersistenceAdapter(jdbc, new LedgerAccountEntityMapper());
+        var accounts = new LedgerAccountPersistenceAdapter(jdbc, new LedgerAccountEntityMapper());
         var journals = new JournalPersistenceAdapter(jdbc, new JournalEntityMapper());
         var postings = new PostingPersistenceAdapter(jdbc, new PostingEntityMapper());
 
@@ -334,8 +408,7 @@ class LedgerPostingConcurrencyIT {
                 journals.findPostedEventId(command.transactionId()).orElseThrow());
 
         // F12 (시간 역순, 계좌별)
-        var entries =
-                postings.findEntriesByExternalAccountId(from, null, null, null, null, 10);
+        var entries = postings.findEntriesByExternalAccountId(from, null, null, null, null, 10);
         assertEquals(1, entries.size());
         assertEquals(result.journalId(), entries.get(0).journalId());
         assertEquals(command.transactionId(), entries.get(0).transactionId());

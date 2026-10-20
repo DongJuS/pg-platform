@@ -5,7 +5,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.time.Duration;
 
-/** 동기 보고서 구현에서 사용할 개발 기본값. 실행 제한 적용 자체는 후속 구현이다. */
+/**
+ * Development budgets enforced by bounded execution; not an operating SLO. Gateway route waits
+ * 100s.
+ */
 @ConfigurationProperties("platform.report.execution")
 public record ReportExecutionProperties(
         @DefaultValue("90s") Duration totalTimeout,
@@ -28,6 +31,9 @@ public record ReportExecutionProperties(
                 || storageTimeout.isZero()
                 || maximumConcurrentGenerations < 1)
             throw new IllegalArgumentException("Report budgets and concurrency must be positive");
+        if (totalTimeout.compareTo(Duration.ofSeconds(90)) > 0)
+            throw new IllegalArgumentException(
+                    "Report total timeout must fit the 100s Gateway budget with 10s headroom");
         if (llmTimeout.plus(pdfTimeout).plus(storageTimeout).compareTo(totalTimeout) >= 0)
             throw new IllegalArgumentException(
                     "Report total timeout must leave time for snapshot, validation and token"

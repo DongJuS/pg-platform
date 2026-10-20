@@ -1,0 +1,175 @@
+{
+  "recorded_at_kst": "2026-10-20T22:29:25.318365+09:00",
+  "base_head": "dc6f7b144f333b01917247066627ff00c7cb5d9c",
+  "branch": "codex/mvp4-wealth-report",
+  "scope": "MVP4 development pipeline, explicit synthetic explanation only; no real LLM report completion",
+  "implemented": [
+    "JWT Gateway route and private owner PDF download",
+    "Strict request/period/account/idempotency validation",
+    "Source-owned Account authorization and repeatable-read Ledger REST snapshot",
+    "Real report PostgreSQL schema, immutable source capture and stage/failure history",
+    "Exact proposed KRW deposit gross metrics, gated pending confirmation",
+    "Structured exact draft amount/currency/cutoff/version validation and bounded prose format",
+    "Actual embedded Korean PDF with measured wrapping, table alignment and multiple pages",
+    "Private PostgreSQL PDF storage with atomic completion; no production S3 implementation",
+    "Global DB reservation and per-user concurrency, bounded workers, stage/total timeout",
+    "Real existing Kafka event contracts with separate event/effect identities, no numeric double counting or automatic report creation",
+    "Expired-attempt detection without automatic external replay",
+    "Independent MVP3 preparation client with caller credential and fail-closed unconfigured inference"
+  ],
+  "not_completed": [
+    "LLM provider/model/transfer authorization and Gateway inference/response security contract",
+    "User confirmation of metrics/data scope/source completeness policy",
+    "Operating S3 adapter, encryption/retention/deletion/admin access policy",
+    "Token restoration/retention policy; no mapping persistence registered",
+    "Event-only complete daily numeric snapshot rebuild",
+    "Operating SLO/load capacity, finite poison-event retry/DLQ policy"
+  ],
+  "default_gates": {
+    "policy_confirmed": false,
+    "real_inference": "REPORT-AI_NOT_CONFIGURED, zero provider calls",
+    "event_consumer_enabled": false,
+    "test_profile": "report-test only, rejects aws/prod/production",
+    "mvp2_automatic_result_query": "existing disabled default unchanged"
+  },
+  "design": {
+    "figma_access": "MCP Starter limit; current connected browser used",
+    "frames_read": {
+      "29:2": "자산관리 보고서",
+      "19:2": "시스템 아키텍처 구성도",
+      "2:2": "00_전체아키텍처",
+      "1:15": "mvp3_보안AI게이트웨이",
+      "19:621": "VPC(보안 AI 게이트 웨이)"
+    },
+    "differences": [
+      "ADR/user synchronous completed response overrides Notion async/202 candidate",
+      "No persistent raw/token dictionary despite Figma DB restore labels",
+      "Development private DB storage/authenticated download; Figma S3/presigned storage remains pending",
+      "Authoritative committed source snapshot is a gated proposal; event projection is notification-only",
+      "Confirmed Account/Ledger MariaDB overrides broad PostgreSQL diagram label"
+    ],
+    "notion_pages_read": [
+      "3faad9292a4980b9ab78c9e81e9c8ca1",
+      "3faad9292a49813bacbef22a4476700a",
+      "3fbad9292a498092bd8af323af928ca0",
+      "3faad9292a49816f8110d5e30813050b",
+      "3faad9292a4981339cb8fae5e2cd0f23",
+      "3faad9292a4981429715cd54675fcd4c",
+      "3faad9292a49801c8deeda524464df1d"
+    ],
+    "unread": "Figma 14:2 detail, Notion PDF/unknown blocks, external AI reviews"
+  },
+  "verification": {
+    "java_current_reports": {
+      "tests": 353,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "java_module_tests": {
+      "wealth-report": 30,
+      "ledger": 43,
+      "api-gateway": 29
+    },
+    "java_executions": [
+      {
+        "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --no-daemon --offline",
+        "passed": true,
+        "tests_at_that_point": 352,
+        "log": "/private/tmp/mvp4-full-build.log"
+      },
+      {
+        "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --no-daemon --offline",
+        "passed": true,
+        "current_tests": 353,
+        "scope": "Final current reports; changed modules rerun, unchanged checks up-to-date",
+        "log": "/private/tmp/mvp4-current-build.log"
+      }
+    ],
+    "docker": {
+      "passed": true,
+      "checks": 221,
+      "subtotals": {
+        "MVP1": 69,
+        "MVP2": 68,
+        "MVP3": 45,
+        "MVP4": 39
+      },
+      "evidence": "infra/docker/evidence/mvp4-business-2026-10-20.json",
+      "source_sha256": "98d73d6c2b8831b916c901193c6ca20646cf8b9b019a5f4fcbaa6c55ea90a898",
+      "source_matches_current": false,
+      "existing_stack_preserved": true,
+      "cleanup_complete": true,
+      "current_source_sha256": "aba65f820fd89b1aaf811dcfc674356dd2a6f52d7100b7eb6e9f57d4ed253850",
+      "runtime_source_matches_current": true,
+      "source_difference": "Only two trailing whitespace removals in fonts/OFL.txt during PR pre-commit checks. Original recorded source hash is retained. Reconstructing with original license bytes matches the Docker run hash; executable code, font bytes, SQL, tests and wiring are unchanged."
+    },
+    "operations_api": {
+      "tests": 9,
+      "passed": true,
+      "log": "/private/tmp/mvp4-ops-tests-final.log"
+    },
+    "pdf": {
+      "renderer": "Actual Java Apache PDFBox 3.0.8 with embedded NanumGothic (OFL included)",
+      "visual_check": "Poppler PNG inspection: Korean text, right-aligned numeric table, no clipping; one-page and two-page cases",
+      "sample": "/Users/ddj/Documents/00_code/05_Project/sinhan_fintech/pg-platform/main-vpc/info/wealth-report/build/evidence/mvp4-docker-synthetic.pdf",
+      "sample_sha256": "623d76572c063fc340b676f190e8867ec9c8065d748cb33546ed24e99fa16c0e",
+      "multiple_pages": 2
+    },
+    "actual_database": "Testcontainers PostgreSQL/MariaDB and isolated Docker service-owned databases; no H2 substitution",
+    "actual_financial_values": "Isolated synthetic opening funds 100000, real ledger posting 20000; frozen balance 80000 and period cashOut 20000",
+    "test_doubles_only": [
+      "Explanation produced under report-test, clearly marked TEST_DOUBLE; no actual LLM inference",
+      "Java service/HTTP fault tests inject explicit source/draft dependencies; Docker source path is real",
+      "HTTP server fixture verifies preparation client authentication/errors; no external provider"
+    ],
+    "recovery_limit": "Actual container restart tested with an explicitly seeded expired DRAFTING row. No claim of killing a paid in-flight provider request.",
+    "privacy_checks": "No names/account numbers/token dictionaries in active schema; actual logs checked against synthetic PII/password/internal credentials; client exceptions and HTTP errors expose fixed codes only",
+    "provider_calls": 0,
+    "aws_resources_created": false,
+    "nat_enabled": false
+  },
+  "failures_corrected": [
+    "Immutable List.contains(null) threw during input validation; replaced with null-safe traversal",
+    "MariaDB current_timestamp mapped through host timezone; source capture now uses epoch microseconds",
+    "Multi-page extraction inserted line breaks within words; assertion checks normalized extracted text, pages visually inspected",
+    "Gateway record constructor binding fixed for real application startup",
+    "MVP2 isolated-project guard extended to MVP4 suite",
+    "Wealth Report internal service token missing in Compose; explicit placeholder wiring added",
+    "Sandbox local-socket/Docker restrictions rerun in approved environment, including all 9 operations tests"
+  ],
+  "preservation": {
+    "preexisting_changes": [
+      ".gitignore",
+      "build-logic/.kotlin/"
+    ],
+    "customer_containers_preserved": true,
+    "customer_volumes_not_deleted": true,
+    "committed": false,
+    "published_or_deployed": false
+  },
+  "infra_sha256": {
+    "infra/docker/run-mvp1-e2e.py": "67eb7cdb2a9f9f8a7a4c5dba1dd750a3762225b68fc903c37c848e62f96419a3",
+    "infra/docker/verify-mvp1.py": "17c0a63c5d3449fe82d70f422889ebbfacaec55359ac3ef57215bb63f51923cc",
+    "infra/docker/verify-mvp2.py": "c59d3984ad783b4d8ccab5a4207a0f2908c5b77e6d122eddfcec0f86c5b0e454",
+    "infra/docker/verify-mvp3.py": "756111af36402213a83aecd3109b0374f445f3352662d5aea427468329fb4210",
+    "infra/docker/verify-mvp4.py": "67e5370b76fad05ebffc477ebf4926174b17b28831c479e9b299a9c564ce8740",
+    "infra/docker/compose.yaml": "629391d66de6034ec7c28633edd379331a6a5a6d06453269a64a4d939ce043a7"
+  },
+  "pr_preparation": {
+    "committed_feature": "41ffa5b",
+    "license_cleanup_only": "main-vpc/info/wealth-report/src/main/resources/fonts/OFL.txt",
+    "license_before_sha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+    "license_after_sha256": "90f6a909ffb2af7f6422ea20042a26180fe5520cba80bbbf75a5e660320d7924",
+    "local_hooks": "staged Gitleaks, whitespace, UTF-8, no wildcard imports, syntax and Conventional Commit checks passed",
+    "docker_rerun": "not repeated for license whitespace only; original evidence retained",
+    "public_evidence_redaction": {
+      "fields": [
+        "routingKey",
+        "idempotency_key"
+      ],
+      "count": 5,
+      "assertion_results_changed": false
+    }
+  }
+}

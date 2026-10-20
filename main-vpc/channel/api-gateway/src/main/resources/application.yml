@@ -28,6 +28,8 @@ pg:
       base-url: ${LEDGER_BASE_URL:http://localhost:8083}
     transfer:
       base-url: ${TRANSFER_BASE_URL:http://localhost:8084}
+    wealth-report:
+      base-url: ${WEALTH_REPORT_BASE_URL:http://localhost:8088}
   gateway:
     jwt:
       # 기본값은 auth(AuthTokenProperties) 기본 issuer/audience와 동일 — 발급 측이 바뀌면 함께 바꾼다.

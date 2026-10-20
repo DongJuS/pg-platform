@@ -1,9 +1,9 @@
 package com.shinhan.pg.wealthreport;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.shinhan.pg.wealthreport.config.ReportExecutionProperties;
-import com.shinhan.pg.wealthreport.config.WealthReportSkeletonConfiguration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -13,6 +13,11 @@ import java.time.Duration;
 import java.util.Map;
 
 class ReportExecutionConfigurationTest {
+    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    @org.springframework.boot.context.properties.EnableConfigurationProperties(
+            ReportExecutionProperties.class)
+    static class PropertiesOnly {}
+
     @Test
     void skeletonBindsOperatorOverridesForSynchronousGeneration() {
         try (var context = new AnnotationConfigApplicationContext()) {
@@ -24,13 +29,13 @@ class ReportExecutionConfigurationTest {
                                     "test",
                                     Map.of(
                                             "platform.report.execution.total-timeout",
-                                            "120s",
+                                            "80s",
                                             "platform.report.execution.maximum-concurrent-generations",
                                             "3")));
-            context.register(WealthReportSkeletonConfiguration.class);
+            context.register(PropertiesOnly.class);
             context.refresh();
             var properties = context.getBean(ReportExecutionProperties.class);
-            assertEquals(Duration.ofSeconds(120), properties.totalTimeout());
+            assertEquals(Duration.ofSeconds(80), properties.totalTimeout());
             assertEquals(3, properties.maximumConcurrentGenerations());
         }
     }

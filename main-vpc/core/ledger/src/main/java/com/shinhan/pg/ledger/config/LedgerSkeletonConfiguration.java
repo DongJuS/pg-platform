@@ -27,15 +27,27 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 
-/** 개발용 의존성 조립. 기본/local/aws에는 업무 스켈레톤 bean을 등록하지 않는다.
- * MVP1-F11~F14 실구현: LockedLedgerWriteSkeleton 대신 LedgerAtomicWriteAdapter를 연결한다
- * (계좌 정렬 잠금·잔액 검사·분개·Outbox의 단일 MariaDB 트랜잭션). */
+/**
+ * 개발용 의존성 조립. 기본/local/aws에는 업무 스켈레톤 bean을 등록하지 않는다. MVP1-F11~F14 실구현: LockedLedgerWriteSkeleton 대신
+ * LedgerAtomicWriteAdapter를 연결한다 (계좌 정렬 잠금·잔액 검사·분개·Outbox의 단일 MariaDB 트랜잭션).
+ */
 @Configuration(proxyBeanMethods = false)
 @Profile("skeleton")
 public class LedgerSkeletonConfiguration {
     @Bean
-    public com.shinhan.pg.ledger.application.port.out.AccountQueryPort accountQueryPort(org.springframework.core.env.Environment env) {
+    public com.shinhan.pg.ledger.application.port.out.AccountQueryPort accountQueryPort(
+            org.springframework.core.env.Environment env) {
         return new com.shinhan.pg.ledger.adapter.out.account.AccountQueryRestAdapter(env);
+    }
+
+    @Bean
+    public com.shinhan.pg.ledger.application.port.in.CollectReportSnapshotUseCase
+            collectReportSnapshotUseCase(
+                    DataSource ds,
+                    com.shinhan.pg.ledger.application.port.out.AccountQueryPort accounts) {
+        return new com.shinhan.pg.ledger.application.service.CollectReportSnapshotService(
+                accounts,
+                new com.shinhan.pg.ledger.adapter.out.persistence.ReportLedgerSnapshotAdapter(ds));
     }
 
     @Bean
@@ -63,7 +75,8 @@ public class LedgerSkeletonConfiguration {
 
     @Bean
     public JournalRepository journalRepository(DataSource dataSource) {
-        return new JournalPersistenceAdapter(new JdbcTemplate(dataSource), new JournalEntityMapper());
+        return new JournalPersistenceAdapter(
+                new JdbcTemplate(dataSource), new JournalEntityMapper());
     }
 
     @Bean
@@ -83,7 +96,8 @@ public class LedgerSkeletonConfiguration {
                 ledgerAtomicWritePort,
                 ledgerAccountRepository,
                 journalRepository,
-                postingRepository, accountQueryPort);
+                postingRepository,
+                accountQueryPort);
     }
 
     @Bean

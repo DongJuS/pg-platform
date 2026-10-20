@@ -4,25 +4,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * <pre>
- * [MVP4-F01,MVP4-F02,MVP4-F03,MVP4-F10] 물리 저장 필드 초안. DB 테이블·컬럼·ORM은 ERD와 후속 확정한다.
- * TODO: @Entity/@Table/@Id 또는 SQL row mapping을 선택한다. 현재 ORM annotation·업무 migration 없음.
- * TODO: 금액/통화·시간대·null·unique·관계 저장을 대조하고 원본 Entity를 API로 반환하지 않는다.
- * </pre>
+ * Physical asset_reports row. Actor scoping belongs to query/use case, never JSON serialization.
  */
-public final class AssetReportEntity {
-    // TODO: id의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID id;
-    // TODO: userId의 컬럼명·null·인덱스·보호 정책 대조
-    private UUID userId;
-    // TODO: asOf의 컬럼명·null·인덱스·보호 정책 대조
-    private Instant asOf;
-    // TODO: status의 컬럼명·null·인덱스·보호 정책 대조
-    private String status;
-    // TODO: calculationVersion의 컬럼명·null·인덱스·보호 정책 대조
-    private String calculationVersion;
-    // TODO: pdfObjectKey의 컬럼명·null·인덱스·보호 정책 대조
-    private String pdfObjectKey;
-    // TODO: completedAt의 컬럼명·null·인덱스·보호 정책 대조
-    private Instant completedAt;
-}
+public record AssetReportEntity(
+        UUID id,
+        UUID userId,
+        Instant asOf,
+        String status,
+        String stage,
+        String calculationVersion,
+        String failureCode,
+        String draftSource,
+        Instant completedAt) {}

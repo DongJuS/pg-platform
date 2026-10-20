@@ -63,10 +63,30 @@ class GatewayRoutesTest {
     }
 
     @Test
+    void configuredEndpointsBindThroughCanonicalConstructor() {
+        var env =
+                new org.springframework.mock.env.MockEnvironment()
+                        .withProperty("pg.clients.auth.base-url", "http://auth:8081")
+                        .withProperty(
+                                "pg.clients.wealth-report.base-url", "http://wealth-report:8088");
+        var bound =
+                org.springframework.boot.context.properties.bind.Binder.get(env)
+                        .bind("pg.clients", GatewayClientProperties.class)
+                        .orElseThrow(AssertionError::new);
+        assertEquals(URI.create("http://wealth-report:8088"), bound.wealthReport().baseUrl());
+    }
+
+    @Test
     void routesAreDeclaredInContractOrder() {
         var ids = routes().stream().map(Route::getId).toList();
         assertEquals(
-                List.of("auth", "ledger-account-views", "account", "transfer", "payment"),
+                List.of(
+                        "auth",
+                        "ledger-account-views",
+                        "account",
+                        "transfer",
+                        "payment",
+                        "wealth-report"),
                 ids,
                 "라우트는 auth → ledger(balances/entries) → account → transfer 순서여야 한다");
     }
@@ -106,6 +126,14 @@ class GatewayRoutesTest {
                 URI.create("http://ledger:8083"), route(routes, "ledger-account-views").getUri());
         assertEquals(URI.create("http://account:8082"), route(routes, "account").getUri());
         assertEquals(URI.create("http://transfer:8084"), route(routes, "transfer").getUri());
+    }
+
+    @Test
+    void synchronousReportRouteHasPrivatePdfPathAndLargerHttpBudget() {
+        var report = route(routes(), "wealth-report");
+        assertTrue(matches(report, "/api/v1/wealth/reports"));
+        assertTrue(matches(report, "/api/v1/wealth/reports/id/pdf"));
+        assertEquals(100000L, report.getMetadata().get("response-timeout"));
     }
 
     @Test
