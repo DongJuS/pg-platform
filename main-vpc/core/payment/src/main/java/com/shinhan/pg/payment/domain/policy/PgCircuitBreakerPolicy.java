@@ -1,17 +1,47 @@
 package com.shinhan.pg.payment.domain.policy;
 
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
-
+import java.time.Duration;
 import java.time.Instant;
 
-/**
- * <pre>
- * [MVP2-F07] FEP 경유 PG 통신의 실패/지연 차단 위치. Resilience4j 도입·임계값·fallback 계약은 미정이며 가짜 승인으로 대체하지 않는다.
- * TODO: 이 파일에 합의된 규칙과 불변식만 구현한다. Spring·JPA·Kafka·HTTP에 의존하지 않는다.
- * </pre>
- */
+/** F07: bounded failure threshold and a single half-open probe; no synthetic approval fallback. */
 public final class PgCircuitBreakerPolicy {
-    public boolean permitsAttempt(int failureCount, Instant lastFailureAt, Instant now) {
-        throw new FeatureNotImplementedException("MVP2-F07");
+    private final int threshold;
+    private final Duration cooldown;
+    private int failures;
+    private Instant lastFailure;
+    private boolean probe;
+
+    public PgCircuitBreakerPolicy() {
+        this(5, Duration.ofSeconds(30));
+    }
+
+    public PgCircuitBreakerPolicy(int threshold, Duration cooldown) {
+        if (threshold < 1 || cooldown.isNegative() || cooldown.isZero())
+            throw new IllegalArgumentException("Invalid breaker settings");
+        this.threshold = threshold;
+        this.cooldown = cooldown;
+    }
+
+    public boolean permitsAttempt(int count, Instant last, Instant now) {
+        return count < threshold || last != null && !now.isBefore(last.plus(cooldown));
+    }
+
+    public synchronized boolean acquire(Instant now) {
+        if (failures < threshold) return true;
+        if (probe || !permitsAttempt(failures, lastFailure, now)) return false;
+        probe = true;
+        return true;
+    }
+
+    public synchronized void succeeded() {
+        failures = 0;
+        lastFailure = null;
+        probe = false;
+    }
+
+    public synchronized void failed(Instant now) {
+        failures++;
+        lastFailure = now;
+        probe = false;
     }
 }

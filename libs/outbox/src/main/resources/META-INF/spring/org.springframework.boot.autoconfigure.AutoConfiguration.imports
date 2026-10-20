@@ -1,1 +1,2 @@
 com.shinhan.pg.common.outbox.OutboxAutoConfiguration
+com.shinhan.pg.common.outbox.OutboxMetricsAutoConfiguration

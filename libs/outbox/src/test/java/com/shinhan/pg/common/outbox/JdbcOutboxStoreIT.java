@@ -1,5 +1,11 @@
 package com.shinhan.pg.common.outbox;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -10,11 +16,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** [CMN-F01] JdbcOutboxStore의 실제 PostgreSQL 위 동작 계약. Flyway 없이 같은 DDL을 쓴다. */
 @EnabledIfSystemProperty(named = "integration", matches = "true")
@@ -22,8 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class JdbcOutboxStoreIT {
     @Container
     @SuppressWarnings("resource")
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
     static final String DDL =
             "create table outbox_events ("
@@ -43,7 +48,9 @@ class JdbcOutboxStoreIT {
 
     @BeforeEach
     void setUp() {
-        var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        var source =
+                new DriverManagerDataSource(
+                        POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         jdbc = new JdbcTemplate(source);
         jdbc.execute("drop table if exists outbox_events");
         jdbc.execute(DDL);
@@ -88,6 +95,57 @@ class JdbcOutboxStoreIT {
         var reclaimed = store.claim(10, UUID.randomUUID(), Duration.ofMillis(-5));
         assertEquals(1, reclaimed.size());
         assertEquals(stale.id(), reclaimed.get(0).id());
+    }
+
+    @Test
+    void backlogIncludesLeasedRowsUntilAcknowledgedAndExportsExistingAlertNames() {
+        var now = Instant.parse("2026-10-20T00:00:00Z");
+        var first = record("synthetic-first");
+        var second = record("synthetic-second");
+        store.append(first);
+        store.append(second);
+        jdbc.update(
+                "update outbox_events set created_at = ?",
+                java.sql.Timestamp.from(now.minusSeconds(600)));
+        var registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        try {
+            var metrics =
+                    new OutboxBacklogMetrics(jdbc, registry, Clock.fixed(now, ZoneOffset.UTC));
+            metrics.refresh();
+            assertEquals(2, registry.get("pg.outbox.unpublished.events").gauge().value());
+            assertEquals(1, registry.get("pg.outbox.metrics.sample.success").gauge().value());
+            assertEquals(
+                    600, registry.get("pg.outbox.oldest.unpublished.age.seconds").gauge().value());
+            var token = UUID.randomUUID();
+            store.claim(10, token, Duration.ofMinutes(2));
+            metrics.refresh();
+            assertEquals(2, registry.get("pg.outbox.unpublished.events").gauge().value());
+            store.published(first.id(), token);
+            store.retry(second.id(), token);
+            metrics.refresh();
+            assertEquals(1, registry.get("pg.outbox.unpublished.events").gauge().value());
+            assertTrue(registry.scrape().contains("pg_outbox_unpublished_events 1.0"));
+            assertTrue(
+                    registry.scrape().contains("pg_outbox_oldest_unpublished_age_seconds 600.0"));
+            assertTrue(!registry.scrape().contains(first.id().toString()));
+            var newToken = UUID.randomUUID();
+            store.claim(10, newToken, Duration.ofMinutes(2));
+            store.published(second.id(), newToken);
+            metrics.refresh();
+            assertEquals(0, registry.get("pg.outbox.unpublished.events").gauge().value());
+            assertEquals(
+                    0, registry.get("pg.outbox.oldest.unpublished.age.seconds").gauge().value());
+            jdbc.execute("alter table outbox_events rename to temporarily_unavailable_outbox");
+            metrics.refresh();
+            assertTrue(Double.isNaN(registry.get("pg.outbox.unpublished.events").gauge().value()));
+            assertEquals(0, registry.get("pg.outbox.metrics.sample.success").gauge().value());
+            jdbc.execute("alter table temporarily_unavailable_outbox rename to outbox_events");
+            metrics.refresh();
+            assertEquals(0, registry.get("pg.outbox.unpublished.events").gauge().value());
+            assertEquals(1, registry.get("pg.outbox.metrics.sample.success").gauge().value());
+        } finally {
+            registry.close();
+        }
     }
 
     private OutboxRecord record(String body) {

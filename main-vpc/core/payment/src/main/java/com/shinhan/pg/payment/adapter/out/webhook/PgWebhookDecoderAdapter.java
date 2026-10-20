@@ -1,13 +1,56 @@
 package com.shinhan.pg.payment.adapter.out.webhook;
 
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shinhan.pg.payment.application.port.out.PgWebhookDecoderPort;
-import com.shinhan.pg.payment.application.readmodel.VerifiedPgEventDraft;
+import com.shinhan.pg.payment.application.readmodel.PgResult;
+import com.shinhan.pg.payment.domain.error.PaymentErrorCode;
+import com.shinhan.pg.payment.domain.error.PaymentException;
 
-/** [MVP2-F06,MVP2-F15] 원문 바이트 서명 검증을 먼저 수행하고 검증된 이벤트만 반환한다. 서명·리플레이 범위 계약은 미정. 실제 기술 구현은 후속이다. */
+import java.security.MessageDigest;
+import java.util.HexFormat;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+/** Verify exact raw bytes before decoding. Never log raw body, HMAC key or supplied signature. */
 public final class PgWebhookDecoderAdapter implements PgWebhookDecoderPort {
+    private final byte[] secret;
+    private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+
+    public PgWebhookDecoderAdapter(String secretHex) {
+        secret = secretHex.isBlank() ? new byte[0] : HexFormat.of().parseHex(secretHex);
+    }
+
     @Override
-    public VerifiedPgEventDraft verifyAndDecode(byte[] rawPayload, String signature) {
-        throw new FeatureNotImplementedException("MVP2-F06");
+    public PgResult verifyAndDecode(byte[] payload, String signature) {
+        try {
+            if (secret.length < 32
+                    || payload == null
+                    || payload.length > 65536
+                    || signature == null
+                    || !signature.matches("[a-f0-9]{64}")) throw new IllegalArgumentException();
+            var mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+            if (!MessageDigest.isEqual(mac.doFinal(payload), HexFormat.of().parseHex(signature)))
+                throw new IllegalArgumentException();
+            var r = json.readValue(payload, PgResult.class);
+            if (r == null
+                    || r.operationId() == null
+                    || r.paymentId() == null
+                    || r.kind() == null
+                    || r.outcome() == null
+                    || r.amount() == null
+                    || r.amount().signum() <= 0
+                    || r.currency() == null
+                    || r.version() < 1
+                    || r.eventId() == null
+                    || r.externalReference() == null
+                    || r.occurredAt() == null) throw new IllegalArgumentException();
+            com.shinhan.pg.common.commonmoney.Money.of(
+                    r.amount(), java.util.Currency.getInstance(r.currency()));
+            return r;
+        } catch (Exception invalid) {
+            throw new PaymentException(PaymentErrorCode.INVALID_WEBHOOK);
+        }
     }
 }

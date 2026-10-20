@@ -1,6 +1,10 @@
 spring:
   application:
     name: mock-pg
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:25432/mock_pg_db}
+    username: ${DB_USERNAME:mock_pg_app}
+    password: ${DB_PASSWORD:}
   config:
     import: classpath:platform-defaults.yml
 server:
