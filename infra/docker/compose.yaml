@@ -384,6 +384,7 @@ services:
     environment:
       <<: *app-environment
       SERVER_PORT: '8088'
+      PG_INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       DB_URL: jdbc:postgresql://postgres:5432/wealth_report_db
       DB_USERNAME: wealth_report_app
       DB_PASSWORD: ${APP_DB_PASSWORD}

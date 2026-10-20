@@ -15,7 +15,7 @@ parser.add_argument('run_directory', type=Path)
 root = parser.parse_args().run_directory.resolve()
 context = json.loads((root/'context.json').read_text())
 project = context['project']
-if not project.startswith('pg_mvp3_') or (root/'mvp3-result.json').exists():
+if not project.startswith(('pg_mvp3_','pg_mvp4_')) or (root/'mvp3-result.json').exists():
     raise SystemExit('Refusing AI acceptance outside a fresh isolated MVP3 run')
 private_env = dict(line.split('=',1) for line in (root/'local.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
 report = {'passed':False, 'checks':[], 'external_llm_calls':0,
