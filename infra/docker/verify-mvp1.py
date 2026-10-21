@@ -19,7 +19,7 @@ if (ROOT / "result.json").exists():
         raise SystemExit("A financial POST was already issued. Inspect its existing transaction; do not rerun.")
 CONTEXT = json.loads((ROOT / "context.json").read_text())
 PROJECT = CONTEXT["project"]
-if not PROJECT.startswith(("pg_mvp1_", "pg_mvp2_", "pg_mvp3_", "pg_mvp4_", "pg_mvp5_")):
+if not PROJECT.startswith(("pg_mvp1_", "pg_mvp2_", "pg_mvp3_", "pg_mvp4_", "pg_mvp5_", "pg_mvp6_")):
     raise SystemExit("Refusing to run financial acceptance probes outside an isolated pg_mvp1_* project")
 private_env = dict(line.split("=",1) for line in (ROOT / "local.env").read_text().splitlines() if "=" in line and not line.startswith("#"))
 OTP_SECRET = bytes.fromhex(private_env["AUTH_OTP_SECRET_HEX"])

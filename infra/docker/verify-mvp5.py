@@ -17,7 +17,7 @@ import uuid
 run = Path(sys.argv[1]).resolve()
 context = json.loads((run / 'context.json').read_text())
 project = context['project']
-if not project.startswith('pg_mvp5_') or (run / 'mvp5-result.json').exists():
+if not project.startswith(('pg_mvp5_', 'pg_mvp6_')) or (run / 'mvp5-result.json').exists():
     raise SystemExit('Refusing SWIFT probes outside a fresh isolated MVP5 project')
 credentials = json.loads((run / 'swift-test-secrets.json').read_text())
 private_env = dict(line.split('=', 1) for line in (run / 'local.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
