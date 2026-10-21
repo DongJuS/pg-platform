@@ -13,7 +13,7 @@ import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, help="Credential-free result JSON destination")
-parser.add_argument("--suite", choices=["MVP1", "MVP2", "MVP3", "MVP4", "MVP5"], default="MVP1")
+parser.add_argument("--suite", choices=["MVP1", "MVP2", "MVP3", "MVP4", "MVP5", "MVP6"], default="MVP1")
 parser.add_argument("--observability", action="store_true", help="Include isolated metrics, logs, traces and local alerts")
 parser.add_argument("--swift-only", action="store_true", help="Debug only MVP5 business probes; final acceptance must omit this flag")
 args = parser.parse_args()
@@ -25,14 +25,16 @@ tag = args.suite.lower() + "-" + secrets.token_hex(4)
 configuration = run / "compose.json"
 env_file = run / "local.env"
 target_services = ["api-gateway", "auth", "account", "ledger", "transfer"]
-if args.suite in {"MVP2", "MVP3", "MVP4", "MVP5"}:
+if args.suite in {"MVP2", "MVP3", "MVP4", "MVP5", "MVP6"}:
     target_services += ["payment", "fep-adapter", "mock-pg"]
-if args.suite in {"MVP3", "MVP4", "MVP5"}:
+if args.suite in {"MVP3", "MVP4", "MVP5", "MVP6"}:
     target_services += ["ai-gateway"]
-if args.suite in {"MVP4", "MVP5"}:
+if args.suite in {"MVP4", "MVP5", "MVP6"}:
     target_services += ["wealth-report"]
-if args.suite == "MVP5":
+if args.suite in {"MVP5", "MVP6"}:
     target_services += ["swift", "mock-swift"]
+if args.suite == "MVP6":
+    target_services += ["aml", "mock-kofiu"]
 context = {"directory": str(run), "project": project, "image_registry": "sinhan_mvp1_test",
            "image_tag": tag, "services": target_services, "account_proxy_workaround": False,
            "otp_verified": True, "regressions_skipped_for_debug": args.swift_only, "source_working_tree_has_changes": True, "observability": args.observability}
@@ -87,16 +89,16 @@ try:
         assert value["name"].startswith(project + "_"), "Refusing shared resources"
     config["services"]["dev-access"]["ports"] = [
         {"target": port, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"}
-        for port in ([8080, 8082, 8083, 8084, 8085, 8091, 8092] if args.suite in {"MVP2", "MVP3", "MVP4", "MVP5"} else [8080, 8082, 8083, 8084])
+        for port in ([8080, 8082, 8083, 8084, 8085, 8091, 8092] if args.suite in {"MVP2", "MVP3", "MVP4", "MVP5", "MVP6"} else [8080, 8082, 8083, 8084])
     ]
-    if args.suite in {"MVP3", "MVP4", "MVP5"}:
+    if args.suite in {"MVP3", "MVP4", "MVP5", "MVP6"}:
         config["services"]["dev-access"]["ports"].append(
             {"target": 8090, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"})
         # Test before the external boundary with no internet network attached to AI Gateway.
         config["services"]["ai-gateway"]["networks"].pop("ai-egress", None)
         config["services"]["ai-gateway"]["environment"]["PG_INTERNAL_CALLER_TOKENS_PAYMENT"] = "synthetic-denied-caller-credential"
         context["ai_gateway_internet_egress"] = False
-    if args.suite in {"MVP4", "MVP5"}:
+    if args.suite in {"MVP4", "MVP5", "MVP6"}:
         config["services"]["wealth-report"]["environment"].update({
             "SPRING_PROFILES_ACTIVE": "docker,skeleton,report-test",
             "PLATFORM_REPORT_POLICY_CONFIRMED": "true",
@@ -105,7 +107,7 @@ try:
             {"target": 8088, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"})
         context["report_explanation_source"] = "TEST_DOUBLE"
         context["report_policy"] = "proposed-policy-enabled-for-isolated-test-only"
-    if args.suite == "MVP5":
+    if args.suite in {"MVP5", "MVP6"}:
         credentials = {name: secrets.token_urlsafe(32) for name in ["transfer", "swift", "swift-operations", "mock-swift"]}
         payload_key = __import__("base64").b64encode(secrets.token_bytes(32)).decode()
         mock_token = secrets.token_urlsafe(32)
@@ -148,6 +150,34 @@ try:
         with (run / "swift-test-secrets.json").open("w") as private:
             __import__("os").chmod(run / "swift-test-secrets.json",0o600)
             json.dump({"callers":credentials,"mock_token":mock_token},private)
+    if args.suite == "MVP6":
+        aml_credentials = {name: secrets.token_urlsafe(32) for name in ["aml", "aml-operations", "payment"]}
+        aml_mock = secrets.token_urlsafe(32)
+        aml_ops = secrets.token_urlsafe(32)
+        context["aml_policy"]="USER_CONFIRMED_DEVELOPMENT_V1"
+        context["aml_institution"]="LOCAL_DURABLE_MOCK_ONLY"
+        for service in ["transfer","ledger","payment","aml","fep-adapter","mock-kofiu"]:
+            env=config["services"][service]["environment"]
+            profiles=env.get("SPRING_PROFILES_ACTIVE","docker,skeleton")
+            env.update({"SPRING_PROFILES_ACTIVE":profiles+",aml-test","PG_AML_ENABLED":"true"})
+            for caller,credential in aml_credentials.items():
+                env["PG_AML_CALLER_TOKENS_"+caller.replace("-","_").upper()]=credential
+        for service in ["aml","fep-adapter","mock-kofiu"]:
+            config["services"][service]["environment"].update({"PG_AML_MOCK_TOKEN":aml_mock,"PG_AML_MOCK_OPERATIONS_TOKEN":aml_ops,
+                "PG_AML_RETRANSMIT_ENABLED":"true","PG_AML_MINIMUM_RETRANSMIT_SECONDS":"1"})
+        config["services"]["aml"]["environment"].update({"PG_AML_POLICY":"development-v1",
+            "PG_AML_EVENTS_ENABLED":"false","PG_AML_DISPATCH_ENABLED":"true","PG_AML_AUTOMATIC_QUERY_ENABLED":"true",
+            "PG_AML_RECOVERY_INTERVAL_MS":"1000","OUTBOX_ENABLED":"true"})
+        # Start the consumer only in verify-mvp6 after prior suites have already published events.
+        for port in [8089,8094]:
+            config["services"]["dev-access"]["ports"].append({"target":port,"published":"0","host_ip":"127.0.0.1","protocol":"tcp"})
+        kofiu_state=run/"kofiu-state"
+        kofiu_state.mkdir(mode=0o777);kofiu_state.chmod(0o777)
+        config["services"]["mock-kofiu"]["volumes"].append({"type":"bind","source":str(kofiu_state),"target":"/state"})
+        config["services"]["mock-kofiu"]["environment"]["PG_AML_MOCK_DIRECTORY"]="/state/kofiu"
+        with (run/"aml-test-secrets.json").open("w") as private:
+            os.chmod(run/"aml-test-secrets.json",0o600)
+            json.dump({"callers":aml_credentials,"mock_token":aml_mock,"operations_token":aml_ops},private)
     if args.observability:
         alloy = run / "alloy.alloy"
         alloy.write_text((repo / "infra/observability/alloy.alloy").read_text().replace("com.docker.compose.project=sinhan_project_docker", "com.docker.compose.project=" + project))
@@ -182,7 +212,7 @@ try:
         completed = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp1.py"), str(run)], cwd=repo, timeout=300)
     if (run / "result.json").exists():
         result = json.loads((run / "result.json").read_text())
-    if not args.swift_only and args.suite in {"MVP2", "MVP3", "MVP4", "MVP5"} and completed.returncode == 0:
+    if not args.swift_only and args.suite in {"MVP2", "MVP3", "MVP4", "MVP5", "MVP6"} and completed.returncode == 0:
         extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp2.py"), str(run)], cwd=repo, timeout=360)
         if (run / "mvp2-result.json").exists():
             payment_result = json.loads((run / "mvp2-result.json").read_text())
@@ -191,7 +221,7 @@ try:
             result["passed"] = result["passed"] and payment_result["passed"] and extra.returncode == 0
         else:
             result["passed"] = False
-    if not args.swift_only and args.suite in {"MVP3", "MVP4", "MVP5"} and result.get("passed"):
+    if not args.swift_only and args.suite in {"MVP3", "MVP4", "MVP5", "MVP6"} and result.get("passed"):
         extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp3.py"), str(run)], cwd=repo, timeout=300)
         if (run / "mvp3-result.json").exists():
             ai_result = json.loads((run / "mvp3-result.json").read_text())
@@ -200,7 +230,7 @@ try:
             result["passed"] = result["passed"] and ai_result["passed"] and extra.returncode == 0
         else:
             result["passed"] = False
-    if not args.swift_only and args.suite in {"MVP4", "MVP5"} and result.get("passed"):
+    if not args.swift_only and args.suite in {"MVP4", "MVP5", "MVP6"} and result.get("passed"):
         extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp4.py"), str(run)], cwd=repo, timeout=300)
         if (run / "mvp4-result.json").exists():
             report_result = json.loads((run / "mvp4-result.json").read_text())
@@ -209,7 +239,7 @@ try:
             result["passed"] = result["passed"] and report_result["passed"] and extra.returncode == 0
         else:
             result["passed"] = False
-    if args.suite == "MVP5" and result.get("passed"):
+    if args.suite in {"MVP5", "MVP6"} and result.get("passed"):
         extra = subprocess.run([sys.executable, str(repo / "infra/docker/verify-mvp5.py"), str(run)], cwd=repo, timeout=480)
         if (run / "mvp5-result.json").exists():
             swift_result = json.loads((run / "mvp5-result.json").read_text())
@@ -218,6 +248,14 @@ try:
             result["passed"] = result["passed"] and swift_result["passed"] and extra.returncode == 0
         else:
             result["passed"] = False
+    if args.suite == "MVP6" and result.get("passed"):
+        extra=subprocess.run([sys.executable,str(repo/"infra/docker/verify-mvp6.py"),str(run)],cwd=repo,timeout=600)
+        if (run/"mvp6-result.json").exists():
+            aml_result=json.loads((run/"mvp6-result.json").read_text())
+            result["mvp6"]=aml_result;result["checks"].extend(aml_result["checks"])
+            result["passed"]=result["passed"] and aml_result["passed"] and extra.returncode==0
+        else:
+            result["passed"]=False
     result["existing_stack_preserved"] = before == original_containers()
     result["images"] = {}
     for service in target_services:
@@ -242,13 +280,13 @@ finally:
         except Exception:
             result["cleanup_complete"] = False
             result["passed"] = False
-    if result.get("cleanup_complete") and args.suite == "MVP5":
+    if result.get("cleanup_complete") and args.suite in {"MVP5", "MVP6"}:
         import shutil
-        for private_directory in [run / "mock-state", *run.glob("private-logs-*")]:
+        for private_directory in [run / "mock-state", run / "kofiu-state", *run.glob("private-logs-*")]:
             if private_directory.exists():
                 shutil.rmtree(private_directory)
         result["private_test_artifacts_removed"] = True
-    for secret_file in ([env_file, configuration, run / "swift-test-secrets.json"] if result.get("cleanup_complete") else []):
+    for secret_file in ([env_file, configuration, run / "swift-test-secrets.json", run / "aml-test-secrets.json"] if result.get("cleanup_complete") else []):
         if secret_file.exists():
             secret_file.unlink()
     (run / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))

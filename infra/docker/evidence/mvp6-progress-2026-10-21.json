@@ -1,0 +1,232 @@
+{
+  "recorded_at_kst": "2026-10-21T09:43:04.477565+09:00",
+  "base_head": "48e8da1cbc680f607235d864959d6a40945bd45d",
+  "branch": "main",
+  "scope": "MVP6 F01-F05 development AML simulation; F06 and production/real institution activation held",
+  "confirmed_user_policy": {
+    "included": "Completed domestic transfer, payment approval and overseas remittance; refunds/cancellation/reversal linked, holds excluded",
+    "rules_version": "development-v1",
+    "single": {
+      "KRW": "5000000",
+      "USD": "5000",
+      "score": 60
+    },
+    "one_hour_count": {
+      "minimum": 5,
+      "score": 40
+    },
+    "24_hour_gross_total": {
+      "KRW": "20000000",
+      "USD": "20000",
+      "score": 70
+    },
+    "report_threshold": 70,
+    "time": "Ledger-owned postedAt; inclusive event-time windows; late evidence re-evaluates affected anchors; currencies never converted or combined",
+    "initial_report": "Automatic STR_SIMULATION, frozen reportId/reportKey/content; no human approval before sending",
+    "recovery": "Query first; explicit actual resend only after a fresh successful institution NOT_RECEIVED lookup",
+    "amendment": "Separate STR_AMENDMENT_SIMULATION, supersedesReportId/revision/LATE_EVIDENCE, explicit admin request; duplicate amendment reuses identity, unchanged evidence cannot create another revision",
+    "access": "Only dedicated authenticated aml-operations administrator identity; ordinary users cannot inspect AML existence",
+    "privacy": "Internal IDs/financial evidence only, no raw names/account numbers/OTP/credentials; independent AML 48-hour retention",
+    "expiry": "Private source/case/report/audit/event contents removed; hash-only dedup tombstones retained to prevent replay"
+  },
+  "implemented": [
+    "Existing Kafka V1 byte consumers, earliest fresh groups, durable Inbox before ack, source REST recovery",
+    "New read-only dedicated AML source contracts owned by Ledger MariaDB and Transfer/Payment PostgreSQL; old APIs unchanged",
+    "Canonical transaction and business-effect dedup, customer/currency PostgreSQL locks, immutable rules and event-time window scoring",
+    "Atomic facts/cases/decision evidence/report intent/Outbox/audit; actual rollback and simultaneous multi-topic tests",
+    "Administrator filters/pagination/detail original and latest evidence/frozen report/status plus safe errors and scoped caller credentials",
+    "AML-to-FEP REST only; durable FEP receipt, attempts, fenced sender lease and separate transport/institution outcome",
+    "Durable local Mock file locks/atomic replace/fsync, acceptance dedup, pending/final/rejection/response-loss scenarios",
+    "Query-before-explicit-resend with send interval/budget; query-only automatic recovery with review threshold",
+    "Immutable linked amendments and no implicit approval gate before original automatic reporting",
+    "48-hour read denial/purge/hash-only replay protection and new AML/Mock KoFIU Loki stream retention"
+  ],
+  "development_defaults": {
+    "enabled": false,
+    "events_enabled": false,
+    "dispatch_enabled": false,
+    "automatic_query_enabled": false,
+    "retransmit_enabled": false,
+    "required_profiles": [
+      "skeleton",
+      "aml-test"
+    ],
+    "aws_prod_production_rejected": true,
+    "query_interval_seconds": 10,
+    "maximum_automatic_queries": 12,
+    "send_lease_seconds": 30,
+    "minimum_retransmit_seconds": 30,
+    "maximum_sends_including_initial": 3
+  },
+  "design": {
+    "figma_access": "MCP metadata succeeded then Starter limit; connected Chrome inspected current frames",
+    "frames": {
+      "19:2": "시스템 아키텍처 구성도",
+      "19:771": "자금세탁; actual node observed through browser, not invented",
+      "2:2": "00_전체아키텍처"
+    },
+    "differences": [
+      "Cash CTR annotation deferred by explicit user F06 hold",
+      "MariaDB Account/Ledger and PostgreSQL AML/FEP follow confirmed decisions despite broad PostgreSQL diagram labels",
+      "Diagram retry label narrowed to query-first and explicit resend only after confirmed absence",
+      "Automatic first report retained; additional evidence review concerns amendment, not human approval before initial send"
+    ],
+    "secondary_notion_pages": [
+      "3faad9292a49813bacbef22a4476700a",
+      "3fbad9292a498092bd8af323af928ca0",
+      "3faad9292a49801c8deeda524464df1d"
+    ],
+    "not_read": [
+      "Notion PDF/unknown blocks",
+      "external AI review"
+    ]
+  },
+  "verification": {
+    "java": {
+      "passed": true,
+      "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --offline --no-daemon",
+      "log": "/private/tmp/mvp6-final-fresh-build.log",
+      "counts": {
+        "tests": 458,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "modules": {
+        "mock-pg": 2,
+        "mock-clearing": 1,
+        "mock-kofiu": 5,
+        "mock-swift": 1,
+        "ai-gateway": 47,
+        "outbox": 11,
+        "swift-messages": 13,
+        "event-contracts": 7,
+        "arch-rules": 6,
+        "common-money": 2,
+        "swift": 26,
+        "aml": 42,
+        "wealth-report": 31,
+        "api-gateway": 29,
+        "ledger": 50,
+        "settlement": 8,
+        "auth": 41,
+        "payment": 29,
+        "transfer": 53,
+        "account": 33,
+        "fep-adapter": 21
+      },
+      "all_tasks_rerun": true
+    },
+    "docker": {
+      "passed": true,
+      "checks": 321,
+      "subtotals": {
+        "MVP1": 69,
+        "MVP2": 61,
+        "MVP3": 44,
+        "MVP4": 39,
+        "MVP5": 58,
+        "MVP6": 50
+      },
+      "log": "/private/tmp/mvp6-accepted-docker.log",
+      "evidence": "infra/docker/evidence/mvp6-business-2026-10-21.json",
+      "source_sha256": "a80e0b4b8b47d6fbeb89778d2e527bd3d6336d2a262ee78573baad638abf545d",
+      "source_matches_current": true,
+      "existing_stack_preserved": true,
+      "cleanup_complete": true,
+      "private_test_artifacts_removed": true,
+      "regressions_skipped": false
+    },
+    "operations_api": {
+      "tests": 9,
+      "passed": true,
+      "log": "/private/tmp/mvp6-ops-tests.log"
+    },
+    "loki_config": {
+      "passed": true,
+      "image": "grafana/loki:3.6.18",
+      "command": "-verify-config=true; isolated no-network container"
+    },
+    "real_resources": "Testcontainers PostgreSQL/MariaDB/Kafka plus fresh isolated Docker service-owned databases; no H2",
+    "faults": [
+      "Cross-topic duplicate replay",
+      "Late-start consumer after previous suites published events",
+      "Actual Mock persistence followed by HTTP read timeout and query without second delivery",
+      "Actual service and PostgreSQL process restarts",
+      "Explicit same-report resend only after NOT_RECEIVED",
+      "Late-evidence real transfer with synthetic source-time shift, followed by linked amendment through HTTP",
+      "Synthetic row-clock advance for 48-hour read denial and scheduled content removal"
+    ],
+    "mock_only": [
+      "Institution receipt/final results are local Mock behavior, no real KoFIU format or regulatory compliance",
+      "MVP4 regression explanations remain TEST_DOUBLE"
+    ],
+    "aws_resources_created": false,
+    "nat_enabled": false,
+    "live_institution_or_llm_calls": 0
+  },
+  "remaining_dependencies": [
+    "Real KoFIU format/identity/legal qualification/transport and production activation are out of scope",
+    "Administrator credential issuance/revocation and UI provisioning",
+    "Poison-event quarantine/DLQ policy, bounded large-history reevaluation and production load/SLO",
+    "Physical purge deadlines for backups/log archives and eventual cleanup policy for hash-only tombstones",
+    "MVP3/MVP4 real LLM/S3 and MVP7 remain unchanged"
+  ],
+  "preservation": {
+    "preexisting_changes": [
+      ".gitignore",
+      "build-logic/.kotlin/"
+    ],
+    "no_reset_or_clean": true,
+    "customer_data_or_volumes_deleted": false,
+    "committed": false,
+    "pushed": false,
+    "pull_request_created": false,
+    "merged": false,
+    "deployed": false
+  },
+  "infra_sha256": {
+    "infra/docker/run-mvp1-e2e.py": "a71237519f7499e65195721af6d2cc7958bc161212cbe769225892d5f77e6c19",
+    "infra/docker/verify-mvp1.py": "36ddad92b4631f91534ae1449b13d0feb8af6fd0042326cf2a9c37230706c142",
+    "infra/docker/verify-mvp2.py": "6bcb0373dea4624a1568a3f74392f215cb94ea905a43896e0a79c13693258d0b",
+    "infra/docker/verify-mvp3.py": "f3633bbd3c0addf8eec8487cf37aac93f6e7270c9760e27fae39ff3e556d9c9c",
+    "infra/docker/verify-mvp4.py": "6b9e99ac2ebf577acfadfd45c3a44fe210bd0115aef2527a3ef0bce921c8c17a",
+    "infra/docker/verify-mvp5.py": "915ee07211384dccb8d2bf7e059dc54fce98ba648b7bed5c70be415067491914",
+    "infra/docker/verify-mvp6.py": "6f5191f2ced41e1875eece23c6dadce02c6a69c1d5c157bcdd946391799ae1c3",
+    "infra/docker/init/kafka-topics.sh": "7cccf5d101a58281805e49ce0a265a60e4eaa3aa15feb632255b88fa5d3367b6",
+    "infra/observability/loki.yml": "44ff8f6dc3e789ef605dc5e69f45cde7f69a830d9760c604c5c096d32891c725"
+  },
+  "pr_preparation": {
+    "prepared_at_kst": "2026-10-21T10:07:51.828755+09:00",
+    "branch": "codex/mvp6-aml-reporting",
+    "committed_feature": "248e76c20217186cb9a1322ae2f2691d88087f52",
+    "committed_docker": "a11efcb451ec7ab3290e78c195e87b2882fc403b",
+    "fresh_java_verification": {
+      "command": "JAVA_HOME=<JDK21> ./gradlew build -Pintegration=true --rerun-tasks --offline --no-daemon",
+      "counts": {
+        "tests": 458,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "passed": true,
+      "log": "/private/tmp/mvp6-pr-build.log"
+    },
+    "fresh_operations_verification": {
+      "tests": 9,
+      "passed": true,
+      "log": "/private/tmp/mvp6-pr-ops.log"
+    },
+    "docker_evidence": "2026-10-21 implementation-phase isolated full suite retained; source and executable infra hashes rechecked during PR preparation, not represented as a new Docker execution",
+    "docker_source_sha256": "a80e0b4b8b47d6fbeb89778d2e527bd3d6336d2a262ee78573baad638abf545d",
+    "author": "Existing ddong name preserved; required contributor email supplied per commit; stored Git author config unchanged",
+    "local_checks": "Staged Gitleaks, UTF-8, whitespace, no wildcard imports, Python/Shell/JSON syntax and Conventional Commit hooks",
+    "earlier_preservation_flags": "The top-level preservation flags record the end of implementation before this separately authorized PR operation",
+    "public_evidence_redactions": {
+      "reason": "Random synthetic routing/idempotency identifiers matched the local generic-api-key entropy detector; actual credentials were not present",
+      "fields": "All occurrences of the two generated routing UUIDs consistently pseudonymized with fixed synthetic UUIDs; fixture idempotency key replaced with a stable synthetic label",
+      "assertion_results_changed": false,
+      "private_original_preserved": true
+    }
+  }
+}

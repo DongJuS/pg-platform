@@ -2,26 +2,34 @@ package com.shinhan.pg.aml.adapter.out.persistence;
 
 import com.shinhan.pg.aml.application.port.out.AmlReportRepository;
 import com.shinhan.pg.aml.domain.model.AmlReport;
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * <pre>
- * [MVP6-F03,MVP6-F05] AmlReport 영속성 구현 위치.
- * TODO: JPA/JdbcClient/MyBatis 선택 후 connection과 AmlReportEntityMapper를 주입한다.
- * TODO: 제약·동시성·원자성·조회 권한을 실제 DB에서 검증한다. 현재 SQL/DB 접근 없음.
- * </pre>
- */
 public final class AmlReportPersistenceAdapter implements AmlReportRepository {
-    @Override
-    public Optional<AmlReport> findById(UUID id) {
-        throw new FeatureNotImplementedException("MVP6-F03");
+    private final JdbcTemplate jdbc;
+
+    public AmlReportPersistenceAdapter(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
     }
 
-    @Override
-    public void save(AmlReport value) {
-        throw new FeatureNotImplementedException("MVP6-F03");
+    public Optional<AmlReport> findById(UUID id) {
+        return jdbc
+                .query(
+                        "select * from aml_reports where created_at>=now()-interval '48 hours' and"
+                                + " id=?",
+                        (r, n) ->
+                                new AmlReport(
+                                        UUID.fromString(r.getString("id")),
+                                        UUID.fromString(r.getString("case_id")),
+                                        r.getString("report_key"),
+                                        "STR_SIMULATION",
+                                        r.getString("status"),
+                                        r.getString("receipt_reference")),
+                        id.toString())
+                .stream()
+                .findFirst();
     }
 }

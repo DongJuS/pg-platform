@@ -2,26 +2,35 @@ package com.shinhan.pg.aml.adapter.out.persistence;
 
 import com.shinhan.pg.aml.application.port.out.AmlCaseRepository;
 import com.shinhan.pg.aml.domain.model.AmlCase;
-import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
+
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * <pre>
- * [MVP6-F01,MVP6-F02,MVP6-F04] AmlCase 영속성 구현 위치.
- * TODO: JPA/JdbcClient/MyBatis 선택 후 connection과 AmlCaseEntityMapper를 주입한다.
- * TODO: 제약·동시성·원자성·조회 권한을 실제 DB에서 검증한다. 현재 SQL/DB 접근 없음.
- * </pre>
- */
 public final class AmlCasePersistenceAdapter implements AmlCaseRepository {
-    @Override
-    public Optional<AmlCase> findById(UUID id) {
-        throw new FeatureNotImplementedException("MVP6-F01");
+    private final JdbcTemplate jdbc;
+
+    public AmlCasePersistenceAdapter(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
     }
 
-    @Override
-    public void save(AmlCase value) {
-        throw new FeatureNotImplementedException("MVP6-F01");
+    public Optional<AmlCase> findById(UUID id) {
+        return jdbc
+                .query(
+                        "select * from aml_cases where created_at>=now()-interval '48 hours' and"
+                                + " id=?",
+                        (r, n) ->
+                                new AmlCase(
+                                        UUID.fromString(r.getString("id")),
+                                        r.getString("case_key"),
+                                        UUID.fromString(r.getString("transaction_id")),
+                                        r.getString("rule_version"),
+                                        r.getInt("risk_score"),
+                                        r.getString("status"),
+                                        r.getTimestamp("created_at").toInstant()),
+                        id.toString())
+                .stream()
+                .findFirst();
     }
 }

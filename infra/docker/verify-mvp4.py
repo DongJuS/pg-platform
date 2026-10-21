@@ -15,7 +15,7 @@ parser.add_argument('run_directory',type=Path)
 run=parser.parse_args().run_directory.resolve()
 context=json.loads((run/'context.json').read_text())
 project=context['project']
-if not project.startswith(('pg_mvp4_','pg_mvp5_')) or (run/'mvp4-result.json').exists():
+if not project.startswith(('pg_mvp4_','pg_mvp5_', 'pg_mvp6_')) or (run/'mvp4-result.json').exists():
     raise SystemExit('Refusing report acceptance outside a fresh isolated MVP4 run')
 private_env=dict(line.split('=',1) for line in (run/'local.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
 report={'passed':False,'checks':[],'explanation_source':'TEST_DOUBLE','real_llm_report_completed':False,'external_llm_calls':0}

@@ -142,3 +142,11 @@ Gateway의 `/api/v1/wealth/reports`와 하위 PDF 경로는 기존 JWT/신원 �
 기존 `pg.clients.transfer/swift/ledger/fep-adapter/mock-swift.base-url`을 재사용한다. 신규 SWIFT 내부 경로는 `pg.swift.caller-tokens.<caller>`로 호출자를 인증하고 기존 PG 경로의 금융 공통 토큰 계약은 보존한다. Swift의 외부 client는 FEP만 호출하고 FEP의 새 기관 adapter는 localhost/Mock SWIFT만 허용한다. `ledger.overseas-applied` 토픽을 추가했으며 토픽 생성과 실제 소비 계약을 구분한다.
 
 `run-mvp1-e2e.py --suite MVP5`만 새 격리 프로젝트에서 `swift-test`·USD 계좌·SWIFT Outbox 및 2초 간격 재전송 시험 옵션을 활성화한다. 운영 재전송 기본 false이며 기본 compose 고객 스택은 활성화하지 않았다. 원문 로그는 console/중앙 로그와 분리한 private sink, 관리자 조회·일반 본인 마스킹, 48시간 보존을 적용한다. [MVP5 계약·체크리스트](../../main-vpc/external/swift/SKELETON.md)를 따른다.
+
+## MVP6 AML 개발 배선
+
+`run-mvp1-e2e.py --suite MVP6`는 새 격리 프로젝트에서 기존 MVP1~MVP5 회귀와 AML/FEP/Mock KoFIU를 함께 검증한다. 기존 스택·볼륨·기존 PG/SWIFT 활성화 설정은 변경하지 않는다. Ledger/Transfer/Payment의 새 AML 조회만 전용 `aml` 토큰으로 보호한다. 관리자 API는 별도 `aml-operations` 자격증명만 허용한다.
+
+AML은 Kafka의 기존 V1을 읽고 원본 서비스 API를 조회한다. 다른 DB를 직접 읽지 않는다. 기관 경로는 AML → FEP 내부 REST → Mock KoFIU다. `aml.report-ready` 토픽은 실제 Outbox 통지용이며 사건을 발행했다고 보고 완료가 되는 것은 아니다. Mock의 새 test-owned 상태 디렉터리는 재시작 후 유지하고 시험 종료 시 해당 자원만 정리한다.
+
+분리 검증은 사용자 확정 `development-v1` 룰을 명시 활성화하고 새 모의 계좌·개발 잔액과 실제 인증/OTP 이체 API를 사용한다. 기본 compose와 운영 profile은 자동 활성화하지 않는다. [AML 계약·정책·체크리스트](../../main-vpc/info/aml/SKELETON.md)와 `evidence/mvp6-progress-2026-10-21.json`을 참조한다.
