@@ -9,125 +9,251 @@ import com.shinhan.pg.aml.application.port.in.ListAmlCasesUseCase;
 import com.shinhan.pg.aml.application.port.in.RetryAmlReportUseCase;
 import com.shinhan.pg.aml.application.port.in.SubmitAmlReportUseCase;
 import com.shinhan.pg.aml.application.port.out.AmlAtomicWritePort;
-import com.shinhan.pg.aml.application.port.out.AmlCaseRepository;
-import com.shinhan.pg.aml.application.port.out.AmlReportRepository;
-import com.shinhan.pg.aml.application.port.out.DetectionRuleRepository;
+import com.shinhan.pg.aml.application.port.out.AmlSourcePort;
 import com.shinhan.pg.aml.application.port.out.FepKofiuPort;
+import com.shinhan.pg.aml.application.readmodel.AmlCaseSummary;
 import com.shinhan.pg.aml.application.result.EvaluateTransactionResult;
 import com.shinhan.pg.aml.application.result.ListAmlCasesResult;
 import com.shinhan.pg.aml.application.result.SubmitAmlReportResult;
+import com.shinhan.pg.aml.domain.model.AmlCase;
+import com.shinhan.pg.aml.domain.model.AmlRuleSet;
+import com.shinhan.pg.common.amlcontracts.AmlProblem;
+import com.shinhan.pg.common.amlcontracts.AmlReportDocument;
+import com.shinhan.pg.common.amlcontracts.KofiuResult;
+import com.shinhan.pg.common.commonerror.ErrorType;
 import com.shinhan.pg.common.commonerror.FeatureNotImplementedException;
 
-/** 기능별 계약과 TODO를 모은 application 구현 자리.
- * Controller는 이 클래스가 구현하는 input port만 호출한다. 외부 호출을 열린 금융 DB 트랜잭션 안에서 수행하지 않는다.
- * 현재 모든 업무 메서드는 명시적 미구현 예외를 던지며 성공 DTO·가짜 금융 결과를 반환하지 않는다.
- */
+import java.util.UUID;
+
+/** MVP6-F01..F05. Authentication is explicit, HTTP is outside local database transactions. */
 public final class AmlApplicationService
         implements EvaluateTransactionUseCase,
-                RetryAmlReportUseCase,
                 ListAmlCasesUseCase,
+                RetryAmlReportUseCase,
                 SubmitAmlReportUseCase {
-    private final FepKofiuPort fepKofiuPort;
-    private final AmlAtomicWritePort amlAtomicWritePort;
-    private final AmlCaseRepository amlCaseRepository;
-    private final AmlReportRepository amlReportRepository;
-    private final DetectionRuleRepository detectionRuleRepository;
+    private final FepKofiuPort fep;
+    private final AmlAtomicWritePort store;
+    private final AmlSourcePort source;
+    private final AmlRuleSet policy;
+    private final boolean enabled, dispatch, automaticQuery, retransmit;
 
     public AmlApplicationService(
-            FepKofiuPort fepKofiuPort,
-            AmlAtomicWritePort amlAtomicWritePort,
-            AmlCaseRepository amlCaseRepository,
-            AmlReportRepository amlReportRepository,
-            DetectionRuleRepository detectionRuleRepository) {
-        this.fepKofiuPort = java.util.Objects.requireNonNull(fepKofiuPort);
-        this.amlAtomicWritePort = java.util.Objects.requireNonNull(amlAtomicWritePort);
-        this.amlCaseRepository = java.util.Objects.requireNonNull(amlCaseRepository);
-        this.amlReportRepository = java.util.Objects.requireNonNull(amlReportRepository);
-        this.detectionRuleRepository = java.util.Objects.requireNonNull(detectionRuleRepository);
+            FepKofiuPort fep,
+            AmlAtomicWritePort store,
+            AmlSourcePort source,
+            AmlRuleSet policy,
+            boolean enabled,
+            boolean dispatch,
+            boolean automaticQuery,
+            boolean retransmit) {
+        this.fep = fep;
+        this.store = store;
+        this.source = source;
+        this.policy = policy;
+        this.enabled = enabled;
+        this.dispatch = dispatch;
+        this.automaticQuery = automaticQuery;
+        this.retransmit = retransmit;
+    }
+
+    public EvaluateTransactionResult evaluateTransaction(EvaluateTransactionCommand c) {
+        requireEnabled("MVP6-F01");
+        store.receive(c);
+        return new EvaluateTransactionResult(c.transactionId());
     }
 
     /**
-     * <pre>
-     * [MVP6-F01,MVP6-F04] Kafka ledger.posted·transfer.completed 기반 룰 평가와 자동 보고. 거래 효과 중복을 구분한다.
-     * TODO: CTR(1천만 원 이상), 분할 거래, 단기 다수 이체 → 위험 점수·케이스 / 예외: —
-     * TODO: 거래 이벤트 → 규칙 평가 → 위험 점수·케이스 → 보고 대상 자동 판정 → 보고서 생성·전송. GET 조회는 상태를 변경하지 않음. / 예외: 규칙·임계값·오탐 처리 등 세부 정책은 미정.
-     * TODO: 재시도·중복 효과 방지·로컬 트랜잭션·상태/Outbox를 연결한다. 실제 DB/통신 구현 없음.
-     * </pre>
+     * Acknowledged Kafka records are recoverable in the Inbox even when original source REST is
+     * unavailable.
      */
-    @Override
-    public EvaluateTransactionResult evaluateTransaction(EvaluateTransactionCommand command) {
-        // TODO: 위 처리 순서를 구현하고 DB/외부 시스템 검증을 추가한다.
-        throw new FeatureNotImplementedException("MVP6-F01");
+    public void recover() {
+        if (!enabled) return;
+        store.purgeExpired();
+        for (var command : store.pending(50)) {
+            AmlSourcePort.Resolution resolution;
+            try {
+                resolution = source.resolve(command.transactionId(), command.journalId());
+            } catch (AmlProblem e) {
+                store.defer(
+                        command,
+                        e.type() == ErrorType.CONFLICT ? "SOURCE_CONFLICT" : "SOURCE_UNAVAILABLE");
+                continue;
+            }
+            store.resolve(command, resolution.fact(), resolution.excludedReason(), policy);
+        }
+        if (dispatch) for (var report : store.readyReports(20)) send(report);
+        if (automaticQuery) for (var report : store.unresolvedReports(20)) queryDocument(report);
     }
 
-    /**
-     * <pre>
-     * [MVP6-F05] 확정 보고 전송 실패를 동일 reportKey로 재시도한다.
-     * TODO: 동일 거래의 여러 이벤트를 중복 집계하지 않음. 보고 ID로 재전송을 식별하고 전송 실패·확인 대기·보고 완료·정상 종결을 구분. / 예외: 응답 유실은 취소로 처리하지 않음. Mock 수신 측 중복 접수·오류 계약은 미정.
-     * TODO: 재시도·중복 효과 방지·로컬 트랜잭션·상태/Outbox를 연결한다. 실제 DB/통신 구현 없음.
-     * </pre>
-     */
-    @Override
-    public void retryAmlReport(RetryAmlReportCommand command) {
-        // TODO: 위 처리 순서를 구현하고 DB/외부 시스템 검증을 추가한다.
-        throw new FeatureNotImplementedException("MVP6-F05");
+    private void send(AmlReportDocument d) {
+        UUID worker = UUID.randomUUID();
+        if (!store.claimReport(d.reportId(), worker)) return;
+        KofiuResult result = null;
+        try {
+            result = fep.submit(d);
+        } catch (AmlProblem e) {
+            if (e.type() != ErrorType.EXTERNAL_FAILURE) {
+                store.reportResult(d, worker, null);
+                throw e;
+            }
+        }
+        store.reportResult(d, worker, result);
     }
 
-    /**
-     * <pre>
-     * [MVP6-F02] 케이스 목록 조회
-     * API 초안: GET /internal/v1/aml/cases
-     * 상태: 신규 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 운영자 권한 / ADMIN
-     * 입력 근거: 상태, 기간
-     * 출력 근거: 케이스 목록
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: —
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. 조회 요청으로 판정·보고 상태를 변경하지 않음.
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project?node-id=19-2
-     * </pre>
-     */
-    @Override
-    public ListAmlCasesResult listAmlCases(ListAmlCasesCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 조회 요청으로 판정·보고 상태를 변경하지 않음.
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP6-F02");
+    private void queryDocument(AmlReportDocument d) {
+        KofiuResult result = null;
+        try {
+            result = fep.query(d);
+        } catch (AmlProblem e) {
+            if (e.type() == ErrorType.NOT_FOUND) {
+                // No FEP receipt means the request never passed its durable boundary. The same
+                // frozen
+                // registration is safe.
+                try {
+                    result = fep.submit(d);
+                } catch (AmlProblem ignored) {
+                    if (ignored.type() == ErrorType.CONFLICT)
+                        result =
+                                new KofiuResult(
+                                        d.reportId(),
+                                        d.reportKey(),
+                                        d.hash(),
+                                        null,
+                                        "UNKNOWN",
+                                        "REVIEW",
+                                        0,
+                                        0);
+                    else if (ignored.type() != ErrorType.EXTERNAL_FAILURE) throw ignored;
+                }
+            } else if (e.type() == ErrorType.CONFLICT) {
+                result =
+                        new KofiuResult(
+                                d.reportId(),
+                                d.reportKey(),
+                                d.hash(),
+                                null,
+                                "UNKNOWN",
+                                "REVIEW",
+                                0,
+                                0);
+            } else if (e.type() != ErrorType.EXTERNAL_FAILURE) throw e;
+        }
+        store.reportResult(d, null, result);
     }
 
-    /**
-     * <pre>
-     * [MVP6-F03] KoFIU 보고 전송
-     * API 초안: POST /internal/v1/aml/cases/{caseId}/reports
-     * 상태: 신규 — skeleton profile의 유효 요청은 업무 미구현 501
-     * 인증/접근: 운영자 권한 / ADMIN
-     * 입력 근거: caseId
-     * 출력 근거: 200이면 '보고 완료'
-     * 정상 응답 후보: 200 (실제 성공 응답은 아직 생성하지 않음)
-     * 오류 후보: 오류 코드면 '전송 실패', 재전송 가능
-     * 구현 순서:
-     * 1. 신뢰한 사용자/서비스 신원과 입력의 의미를 검증한다.
-     * 2. 보고서 생성 → FEP → Mock KoFIU
-     * 3. 필요한 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다. 조회는 상태를 바꾸지 않는다.
-     * 4. 결과를 DTO로 반환하고 단계·실패·재시도 사실을 보존한다.
-     * TODO: 사람 승인 단계를 추가하지 않는다. 자동 판정한 보고서의 생성·전송 유스케이스 진입점이다.
-     * TODO: FEP 접수 성공과 KoFIU Mock 최종 접수를 구분한다. 전송 실패는 보고 확정 취소가 아니라 재전송 대상이다.
-     * TODO[CONTRACT]: DTO 필드/필수성·성공/실패 상태·페이지네이션은 구현 전 최종 대조한다.
-     * 출처: https://www.figma.com/design/JOeniY2Om7ofAt39NluJXl/sinhan-financial-project?node-id=19-2
-     * </pre>
-     */
-    @Override
-    public SubmitAmlReportResult submitAmlReport(SubmitAmlReportCommand command) {
-        // TODO 1: 인증된 주체·자원 접근 범위와 입력을 확인한다.
-        // TODO 2: 보고서 생성 → FEP → Mock KoFIU
-        // TODO 3: 외부 호출과 짧은 로컬 DB 트랜잭션을 분리한다.
-        // TODO 4: 확정 결과·오류·재개 지점을 DTO와 처리 이력으로 연결한다.
-        throw new FeatureNotImplementedException("MVP6-F03");
+    public ListAmlCasesResult listAmlCases(ListAmlCasesCommand c) {
+        requireEnabled("MVP6-F02");
+        authorize(c.callerServiceId());
+        int page = c.page() == null ? 0 : c.page(), size = c.size() == null ? 20 : c.size();
+        AmlProblem.require(page >= 0 && page <= 100000 && size >= 1 && size <= 100);
+        AmlProblem.require(
+                c.status() == null
+                        || java.util.Set.of("NO_REPORT", "DETECTED", "REPORT_REQUIRED", "REVIEW")
+                                .contains(c.status()));
+        AmlProblem.require(c.from() == null || c.to() == null || c.from().isBefore(c.to()));
+        store.auditAccess(new UUID(0, 0), "CASE_LIST", c.callerServiceId());
+        var rows = store.list(c.status(), c.from(), c.to(), page, size + 1);
+        boolean more = rows.size() > size;
+        return new ListAmlCasesResult(
+                rows.stream()
+                        .limit(size)
+                        .map(
+                                r ->
+                                        new AmlCaseSummary(
+                                                r.id(),
+                                                r.status(),
+                                                r.riskScore(),
+                                                r.ruleVersion(),
+                                                r.createdAt()))
+                        .toList(),
+                more ? page + 1 : null);
+    }
+
+    public AmlCase getCase(String caller, UUID id) {
+        requireEnabled("MVP6-F02");
+        authorize(caller);
+        store.auditAccess(id, "CASE_READ", caller);
+        return store.caseById(id);
+    }
+
+    public com.shinhan.pg.aml.application.readmodel.AmlCaseDetails details(String caller, UUID id) {
+        requireEnabled("MVP6-F02");
+        authorize(caller);
+        store.auditAccess(id, "CASE_READ", caller);
+        return store.caseDetails(id);
+    }
+
+    public AmlReportDocument document(String caller, UUID caseId) {
+        requireEnabled("MVP6-F02");
+        authorize(caller);
+        store.auditAccess(caseId, "REPORT_DOCUMENT_READ", caller);
+        return store.reportForCase(caseId);
+    }
+
+    public SubmitAmlReportResult submitAmlReport(SubmitAmlReportCommand c) {
+        requireEnabled("MVP6-F03");
+        authorize(c.callerServiceId());
+        if (!dispatch) throw new AmlProblem("AML-DISPATCH-DISABLED", ErrorType.CONFLICT);
+        var d = store.reportForCase(c.caseId());
+        send(d);
+        var r = store.reportState(d.reportId());
+        return new SubmitAmlReportResult(d.reportId(), r.institutionStatus(), r.receiptReference());
+    }
+
+    public KofiuResult report(String caller, UUID caseId) {
+        requireEnabled("MVP6-F02");
+        authorize(caller);
+        return store.reportState(store.reportForCase(caseId).reportId());
+    }
+
+    public KofiuResult query(String caller, UUID caseId) {
+        requireEnabled("MVP6-F05");
+        authorize(caller);
+        var d = store.reportForCase(caseId);
+        queryDocument(d);
+        return store.reportState(d.reportId());
+    }
+
+    public KofiuResult retransmit(String caller, UUID caseId) {
+        requireEnabled("MVP6-F05");
+        authorize(caller);
+        if (!retransmit) throw new AmlProblem("AML-RETRANSMIT-DISABLED", ErrorType.CONFLICT);
+        var d = store.reportForCase(caseId);
+        var result = fep.retransmit(d);
+        store.reportResult(d, null, result);
+        return store.reportState(d.reportId());
+    }
+
+    public KofiuResult amend(String caller, UUID caseId, UUID previousReportId) {
+        requireEnabled("MVP6-F03");
+        authorize(caller);
+        var d = store.amend(caseId, previousReportId);
+        if (dispatch) send(d);
+        return store.reportState(d.reportId());
+    }
+
+    public void reevaluate(String caller) {
+        requireEnabled("MVP6-F04");
+        authorize(caller);
+        if (policy == null) throw new AmlProblem("AML-POLICY-PENDING", ErrorType.CONFLICT);
+        store.reevaluate(policy);
+    }
+
+    /** Batch retry means result lookup, never a blind institution resend. */
+    public void retryAmlReport(RetryAmlReportCommand c) {
+        requireEnabled("MVP6-F05");
+        AmlProblem.require(c.reportId() != null && c.reportKey() != null);
+        var document = store.reportDocument(c.reportId());
+        if (!document.reportKey().equals(c.reportKey())) throw AmlProblem.conflict();
+        queryDocument(document);
+    }
+
+    private void requireEnabled(String feature) {
+        if (!enabled) throw new FeatureNotImplementedException(feature);
+    }
+
+    private static void authorize(String caller) {
+        if (!"aml-operations".equals(caller))
+            throw new AmlProblem("AML-ADMIN-REQUIRED", ErrorType.FORBIDDEN);
     }
 }

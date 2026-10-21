@@ -2,5 +2,9 @@ package com.shinhan.pg.aml.application.command;
 
 import java.util.UUID;
 
-/** 내부 입력 초안. 추적 requestId와 금융 멱등성·eventId·업무 ID를 구분한다. 외부 wire 계약은 아니다. */
-public record EvaluateTransactionCommand(UUID requestId, UUID eventId, UUID transactionId) {}
+public record EvaluateTransactionCommand(
+        UUID requestId, UUID eventId, UUID transactionId, String topic, UUID journalId) {
+    public EvaluateTransactionCommand(UUID requestId, UUID eventId, UUID transactionId) {
+        this(requestId, eventId, transactionId, "ledger.posted", null);
+    }
+}

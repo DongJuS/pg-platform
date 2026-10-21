@@ -47,3 +47,6 @@ include(":outbox")
 project(":outbox").projectDir = file("libs/outbox")
 include(":arch-rules")
 project(":arch-rules").projectDir = file("libs/arch-rules")
+
+include(":aml-contracts")
+project(":aml-contracts").projectDir = file("libs/aml-contracts")

@@ -16,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.UUID;
 
-/** 개발용 API 스켈레톤. 기본/local/aws에는 등록하지 않으며 성공한 금융 결과를 생성하지 않는다.
- * 필드명·상태·인증 방식은 각 메서드의 출처/미정을 확인한다.
+/**
+ * MVP6 development API. Dedicated operations caller is checked by the application service. Default
+ * profile stays inactive. Enabled reads never approve, generate or transmit a report. Detailed
+ * implemented contract and policy holds: SKELETON.md.
  */
 @RestController
 @Profile("skeleton")
@@ -29,6 +31,8 @@ public final class AmlCaseController {
     }
 
     /**
+     *
+     *
      * <pre>
      * [MVP6-F02] 케이스 목록 조회
      * API 초안: GET /internal/v1/aml/cases
@@ -55,7 +59,6 @@ public final class AmlCaseController {
                     Instant to,
             @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "size", required = false) Integer size) {
-        // TODO: 인증 문맥 검증·요청 변환·Bean Validation은 계약 확정 후 연결한다.
         var result =
                 listAmlCasesUseCase.listAmlCases(
                         new ListAmlCasesCommand(

@@ -36,6 +36,10 @@ schema_config:
 limits_config:
   # 보존 초기값 7일(로컬). 금융 로그 보존 정책 미정 — 확정 전 임의 적용 금지.
   retention_period: 168h
+  retention_stream:
+    - selector: '{service=~"aml|mock-kofiu"}'
+      priority: 10
+      period: 48h
   allow_structured_metadata: true
 
 compactor:
